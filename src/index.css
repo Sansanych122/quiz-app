@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-textMain font-sans antialiased min-h-screen;
+    /* Додаємо ледь помітний патерн або просто залишаємо чистий колір */
+  }
+}
+
+/* Утиліта для Glassmorphism карточок */
+@layer components {
+  .glass-panel {
+    @apply bg-surface backdrop-blur-xl border border-white/50 shadow-glass rounded-2xl;
+  }
+}
