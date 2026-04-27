@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, RefreshCw, CheckCircle2, XCircle, Loader2, Shuffle, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { 
+  ArrowLeft, RefreshCw, CheckCircle2, XCircle, 
+  Loader2, Shuffle, RotateCcw, Eye, EyeOff, Undo2 
+} from 'lucide-react';
 
 const shuffleArray = (array) => {
   const newArray = [...array];
@@ -24,8 +27,9 @@ export default function QuizPage() {
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   
-  // Новий стейт для режиму "фокусу на помилках"
-  const [hideCorrect, setHideCorrect] = useState(false);
+  const [showAllCorrect, setShowAllCorrect] = useState(false);
+  const [mistakesOnlyMode, setMistakesOnlyMode] = useState(false);
+  const [targetMistakeIds, setTargetMistakeIds] = useState([]); // Запам'ятовуємо, які саме тести були завалені
 
   useEffect(() => {
     fetchQuizData();
@@ -35,344 +39,243 @@ export default function QuizPage() {
     setLoading(true);
     try {
       const { data: secData } = await supabase
-        .from('sections')
-        .select('title, course_id')
-        .eq('id', sectionId)
-        .single();
+        .from('sections').select('title, course_id').eq('id', sectionId).single();
       setSection(secData);
 
       const { data: qData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('section_id', sectionId)
-        .order('created_at', { ascending: true });
+        .from('questions').select('*').eq('section_id', sectionId).order('created_at', { ascending: true });
 
-      const questionsWithShuffledOptions = (qData || []).map(q => ({
+      const prepared = (qData || []).map(q => ({
         ...q,
         shuffledOptions: shuffleArray(q.options)
       }));
       
-      setQuestions(questionsWithShuffledOptions);
+      setQuestions(prepared);
 
       const { data: aData } = await supabase
-        .from('user_answers')
-        .select('question_id, is_correct, chosen_answer')
-        .eq('user_id', user.id);
+        .from('user_answers').select('question_id, is_correct, chosen_answer').eq('user_id', user.id);
       
       const answersMap = {};
       aData?.forEach(ans => {
-        answersMap[ans.question_id] = {
-          is_correct: ans.is_correct,
-          chosen_answer: ans.chosen_answer
-        };
+        answersMap[ans.question_id] = { is_correct: ans.is_correct, chosen_answer: ans.chosen_answer };
       });
       setAnswers(answersMap);
 
     } catch (error) {
-      console.error('Помилка завантаження тесту:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleShuffleQuestions = () => {
-    setQuestions(prev => shuffleArray(prev));
+  const handleShuffleAll = () => {
+    const shuffledQ = shuffleArray(questions).map(q => ({
+      ...q,
+      shuffledOptions: shuffleArray(q.options)
+    }));
+    setQuestions(shuffledQ);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleAnswer = async (questionId, option, correctAnswer) => {
-    if (answers[questionId]) return; 
+    if (answers[questionId] || showAllCorrect) return; 
 
     const isCorrect = option === correctAnswer;
-    
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: { is_correct: isCorrect, chosen_answer: option }
-    }));
+    setAnswers(prev => ({ ...prev, [questionId]: { is_correct: isCorrect, chosen_answer: option } }));
 
-    const { error } = await supabase
-      .from('user_answers')
-      .upsert({
-        user_id: user.id,
-        question_id: questionId,
-        is_correct: isCorrect,
-        chosen_answer: option
-      });
-
-    if (error) console.error('Помилка збереження відповіді:', error);
+    await supabase.from('user_answers').upsert({
+      user_id: user.id, question_id: questionId, is_correct: isCorrect, chosen_answer: option
+    });
   };
 
-  // Скидання всього прогресу
   const resetProgress = async () => {
-    if (!window.confirm('Скинути весь прогрес цього розділу?')) return;
-    
+    if (!window.confirm('Очистити весь прогрес цього розділу?')) return;
     setResetting(true);
-    try {
-      const qIds = questions.map(q => q.id);
-      
-      const { error } = await supabase
-        .from('user_answers')
-        .delete()
-        .eq('user_id', user.id)
-        .in('question_id', qIds);
-
-      if (error) throw error;
-      
-      setAnswers({});
-      setHideCorrect(false); // Вимикаємо фільтр при повному скиданні
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error) {
-      alert('Помилка при скиданні прогресу');
-    } finally {
-      setResetting(false);
-    }
+    const qIds = questions.map(q => q.id);
+    await supabase.from('user_answers').delete().eq('user_id', user.id).in('question_id', qIds);
+    setAnswers({});
+    setMistakesOnlyMode(false);
+    setShowAllCorrect(false);
+    setResetting(false);
   };
 
-  // НОВЕ: Скидання ТІЛЬКИ неправильних відповідей
-  const resetIncorrectProgress = async () => {
+  // Перемикач режиму "Робота над помилками"
+  const toggleMistakesMode = async () => {
+    if (mistakesOnlyMode) {
+      // Виходимо з режиму і показуємо всі тести
+      setMistakesOnlyMode(false);
+      return;
+    }
+
+    // Знаходимо тільки ті тести, які були завалені
     const incorrectIds = Object.entries(answers)
       .filter(([id, ans]) => !ans.is_correct && questions.some(q => q.id === id))
       .map(([id]) => id);
 
-    if (incorrectIds.length === 0) {
-      alert('У вас немає неправильних відповідей у цьому розділі!');
-      return;
-    }
-
-    if (!window.confirm('Скинути неправильні відповіді, щоб пройти їх знову?')) return;
+    if (incorrectIds.length === 0) return alert('У вас немає завалених тестів у цьому розділі!');
+    
+    if (!window.confirm('Розпочати роботу над помилками? Завалені тести будуть очищені, щоб ви могли пройти їх знову.')) return;
     
     setResetting(true);
-    try {
-      const { error } = await supabase
-        .from('user_answers')
-        .delete()
-        .eq('user_id', user.id)
-        .in('question_id', incorrectIds);
-
-      if (error) throw error;
-      
-      // Оновлюємо локальний стейт
-      setAnswers(prev => {
-        const newAnswers = { ...prev };
-        incorrectIds.forEach(id => delete newAnswers[id]);
-        return newAnswers;
-      });
-      
-      // Автоматично вмикаємо приховування правильних відповідей для зручності
-      setHideCorrect(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error) {
-      alert('Помилка при скиданні помилок');
-    } finally {
-      setResetting(false);
-    }
+    // Видаляємо з бази тільки завалені відповіді, даючи другий шанс
+    await supabase.from('user_answers').delete().eq('user_id', user.id).in('question_id', incorrectIds);
+    
+    setAnswers(prev => {
+      const next = { ...prev };
+      incorrectIds.forEach(id => delete next[id]);
+      return next;
+    });
+    
+    setTargetMistakeIds(incorrectIds); // Запам'ятовуємо їх, щоб показати тільки їх
+    setMistakesOnlyMode(true);
+    setShowAllCorrect(false);
+    setResetting(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-primary">
-        <Loader2 className="animate-spin" size={32} />
-      </div>
-    );
-  }
+  // Фільтруємо питання для відображення
+  const visibleQuestions = useMemo(() => {
+    if (mistakesOnlyMode) {
+      // Показуємо ТІЛЬКИ ті питання, які були у списку завалених
+      return questions.filter(q => targetMistakeIds.includes(q.id));
+    }
+    return questions;
+  }, [questions, mistakesOnlyMode, targetMistakeIds]);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={40} /></div>;
 
   const answeredCount = Object.keys(answers).filter(id => questions.some(q => q.id === id)).length;
-  const correctCount = Object.values(answers).filter(a => a.is_correct && questions.some(q => q.id === Object.keys(answers).find(key => answers[key] === a))).length;
-  
-  const progressPercent = questions.length ? Math.round((answeredCount / questions.length) * 100) : 0;
+  const correctCount = Object.values(answers).filter(a => a.is_correct && questions.some(q => q.id === Object.keys(answers).find(k => answers[k] === a))).length;
+  const progressPercent = Math.round((answeredCount / questions.length) * 100) || 0;
   const correctPercent = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0;
-
-  // Фільтруємо питання для відображення
-  const visibleQuestions = hideCorrect 
-    ? questions.filter(q => !answers[q.id] || !answers[q.id].is_correct)
-    : questions;
 
   return (
     <div className="min-h-screen bg-background pb-20">
       
-      {/* Фіксована панель прогресу */}
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-gray-100 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3">
-          <div className="flex justify-between items-center mb-3">
+      {/* ПАНЕЛЬ КЕРУВАННЯ */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div className="max-w-4xl mx-auto px-2 py-2">
+          
+          <div className="flex items-center justify-between w-full">
             
-            <button 
-              onClick={() => navigate(`/course/${section?.course_id}`)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-textMuted hover:text-textMain"
-              title="Повернутися до розділів"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            
-            <div className="flex flex-col items-center">
-              <span className="text-sm font-bold text-textMain tracking-wide">
-                Прогрес: {answeredCount} / {questions.length}
-              </span>
-              {answeredCount > 0 && (
-                <span className={`text-xs font-semibold ${correctPercent >= 70 ? 'text-emerald-600' : correctPercent >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>
-                  Правильно: {correctPercent}% ({correctCount})
+            {/* ЛІВА ЧАСТИНА: Назад + Статистика */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-1.5 sm:pr-2 border-r border-gray-200">
+              <button onClick={() => navigate(`/course/${section?.course_id}`)} className="p-1 sm:p-1.5 text-textMuted hover:bg-gray-100 rounded-lg transition-colors">
+                <ArrowLeft size={18} />
+              </button>
+              
+              <div className="flex flex-col items-start justify-center min-w-[35px]">
+                <span className="text-[10px] sm:text-[11px] font-bold text-textMain leading-tight">{answeredCount}/{questions.length}</span>
+                <span className={`text-[10px] sm:text-[11px] font-bold leading-tight ${correctPercent >= 70 ? 'text-emerald-600' : 'text-orange-500'}`}>
+                  {correctPercent}%
                 </span>
-              )}
+              </div>
             </div>
 
-            {/* Оновлений блок кнопок керування */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              <button 
-                onClick={() => setHideCorrect(!hideCorrect)}
-                className={`p-2 transition-colors rounded-lg ${hideCorrect ? 'bg-primary/10 text-primary' : 'text-textMuted hover:text-primary hover:bg-primary/5'}`}
-                title={hideCorrect ? "Показати всі питання" : "Приховати правильні відповіді"}
-              >
-                {hideCorrect ? <EyeOff size={18} /> : <Eye size={18} />}
+            {/* ПРАВА ЧАСТИНА: 4 компактні кнопки без скролу */}
+            <div className="flex items-center justify-end gap-1 sm:gap-1.5 flex-1">
+              
+              {/* Змішати */}
+              <button onClick={handleShuffleAll} className="flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-[50px] sm:min-w-[70px] p-1.5 bg-white border border-gray-200 rounded-lg text-[9px] sm:text-[11px] font-bold hover:border-primary transition-all shadow-sm active:scale-95">
+                <Shuffle size={14} className="text-primary" />
+                <span>Змішати</span>
               </button>
-              <button 
-                onClick={handleShuffleQuestions}
-                className="p-2 text-textMuted hover:text-primary transition-colors rounded-lg hover:bg-primary/5 hidden sm:block"
-                title="Перемішати порядок питань"
-              >
-                <Shuffle size={18} />
+
+              {/* Відповіді */}
+              <button onClick={() => setShowAllCorrect(!showAllCorrect)} className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-[50px] sm:min-w-[70px] p-1.5 border rounded-lg text-[9px] sm:text-[11px] font-bold transition-all shadow-sm active:scale-95 ${showAllCorrect ? 'bg-primary text-white border-primary' : 'bg-white border-gray-100'}`}>
+                {showAllCorrect ? <EyeOff size={14} /> : <Eye size={14} className="text-primary" />}
+                <span>{showAllCorrect ? 'Сховати' : 'Відповіді'}</span>
               </button>
-              <button 
-                onClick={resetIncorrectProgress}
-                disabled={resetting}
-                className="p-2 text-textMuted hover:text-yellow-600 transition-colors rounded-lg hover:bg-yellow-50"
-                title="Скинути тільки помилки"
-              >
-                <RotateCcw size={18} className={resetting ? "animate-spin" : ""} />
+
+              {/* Помилки / Повернутись */}
+              {mistakesOnlyMode ? (
+                <button onClick={toggleMistakesMode} className="flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-[50px] sm:min-w-[70px] p-1.5 bg-blue-50 border border-blue-100 rounded-lg text-[9px] sm:text-[11px] font-bold text-blue-700 hover:bg-blue-100 shadow-sm active:scale-95">
+                  <Undo2 size={14} />
+                  <span>Назад</span>
+                </button>
+              ) : (
+                <button onClick={toggleMistakesMode} className="flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-[50px] sm:min-w-[70px] p-1.5 bg-yellow-50 border border-yellow-100 rounded-lg text-[9px] sm:text-[11px] font-bold text-yellow-700 hover:bg-yellow-100 shadow-sm active:scale-95">
+                  <RotateCcw size={14} />
+                  <span>Помилки</span>
+                </button>
+              )}
+
+              {/* Скинути */}
+              <button onClick={resetProgress} className="flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-[50px] sm:min-w-[70px] p-1.5 bg-red-50 border border-red-100 rounded-lg text-[9px] sm:text-[11px] font-bold text-red-600 hover:bg-red-100 shadow-sm active:scale-95">
+                <RefreshCw size={14} />
+                <span>Скинути</span>
               </button>
-              <button 
-                onClick={resetProgress}
-                disabled={resetting}
-                className="p-2 text-textMuted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 hidden sm:block"
-                title="Очистити весь прогрес розділу"
-              >
-                <RefreshCw size={18} className={resetting ? "animate-spin" : ""} />
-              </button>
+
             </div>
-            
+
           </div>
-          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-primary transition-all duration-500 ease-out" 
-              style={{ width: `${progressPercent}%` }}
-            ></div>
+
+          {/* Смужка прогресу */}
+          <div className="w-full h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
+            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
           </div>
+          
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 mt-8">
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-textMain">{section?.title}</h1>
-          {hideCorrect && (
-            <span className="inline-block mt-2 px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">
-              Режим роботи над помилками
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          {visibleQuestions.length === 0 ? (
-            <div className="text-center p-8 glass-panel text-textMuted">
-              Тут поки немає питань для відображення.
-            </div>
-          ) : (
-            visibleQuestions.map((q, idx) => {
-              const userAnswer = answers[q.id];
-              // Зберігаємо оригінальний номер питання для відображення
-              const originalIdx = questions.findIndex(orig => orig.id === q.id) + 1;
-              
-              return (
-                <div key={q.id} className="glass-panel p-6 sm:p-8">
-                  <div className="flex gap-4 mb-6">
-                    <span className="text-sm font-bold text-primary bg-primary/10 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" title={`Питання №${originalIdx}`}>
-                      {originalIdx}
-                    </span>
-                    <p className="text-textMain font-medium leading-relaxed">{q.content}</p>
-                  </div>
-
-                  <div className="grid gap-3">
-                    {q.shuffledOptions.map((option, oIdx) => {
-                      const isSelected = userAnswer?.chosen_answer === option;
-                      const isCorrect = option === q.correct_answer;
-                      const showSuccess = (userAnswer && isCorrect);
-                      const showError = (isSelected && !userAnswer.is_correct);
-
-                      let btnClass = "w-full text-left px-5 py-4 rounded-xl border transition-all duration-200 flex justify-between items-center ";
-                      
-                      if (!userAnswer) {
-                        btnClass += "bg-white border-gray-100 hover:border-primary hover:shadow-sm";
-                      } else if (showSuccess) {
-                        btnClass += "bg-emerald-50 border-emerald-200 text-emerald-700 font-medium";
-                      } else if (showError) {
-                        btnClass += "bg-red-50 border-red-200 text-red-700";
-                      } else {
-                        btnClass += "bg-gray-50 border-gray-100 text-gray-400 opacity-60";
-                      }
-
-                      return (
-                        <button
-                          key={oIdx}
-                          disabled={!!userAnswer}
-                          onClick={() => handleAnswer(q.id, option, q.correct_answer)}
-                          className={btnClass}
-                        >
-                          <span className="flex-grow">{option}</span>
-                          {showSuccess && <CheckCircle2 size={18} />}
-                          {showError && <XCircle size={18} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Фінальний екран результатів */}
-        {progressPercent === 100 && (
-          <div className="mt-12 text-center p-8 sm:p-12 glass-panel border border-primary/20 shadow-lg relative overflow-hidden">
-            <div className="absolute top-[-20%] left-[-10%] w-64 h-64 bg-primary/10 rounded-full mix-blend-multiply filter blur-3xl"></div>
-            
-            <div className="relative z-10">
-              {correctPercent === 100 ? (
-                <>
-                  <div className="w-20 h-20 bg-gradient-to-tr from-green-400 to-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-200">
-                    <Trophy size={40} />
-                  </div>
-                  <h2 className="text-3xl font-bold text-textMain mb-3">Ідеально!</h2>
-                  <p className="text-textMuted mb-8 text-lg">Ви пройшли всі тести без жодної помилки.</p>
-                </>
-              ) : (
-                <>
-                  <div className="w-20 h-20 bg-gradient-to-tr from-yellow-400 to-orange-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-yellow-200">
-                    <CheckCircle2 size={40} />
-                  </div>
-                  <h2 className="text-3xl font-bold text-textMain mb-3">Розділ завершено!</h2>
-                  <p className="text-textMuted mb-8 text-lg">Ваш результат: <span className="font-bold text-textMain">{correctPercent}%</span> правильних відповідей.</p>
-                </>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                {correctPercent < 100 && (
-                  <button 
-                    onClick={resetIncorrectProgress}
-                    className="px-8 py-3.5 bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 rounded-xl font-medium transition-all flex items-center justify-center gap-2"
-                  >
-                    <RotateCcw size={18} /> Виправити помилки
-                  </button>
-                )}
-                <button 
-                  onClick={() => navigate(`/course/${section?.course_id}`)}
-                  className="px-8 py-3.5 bg-primary text-white rounded-xl font-medium shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all"
-                >
-                  До списку розділів
-                </button>
-              </div>
-            </div>
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
+        <h1 className="text-center text-sm font-bold text-textMuted mb-2 sm:mb-3">{section?.title}</h1>
+        
+        {/* ІНДИКАТОР РЕЖИМУ РОБОТИ НАД ПОМИЛКАМИ */}
+        {mistakesOnlyMode && (
+          <div className="text-center mb-4 sm:mb-6">
+             <span className="inline-block px-4 py-1.5 bg-yellow-100 text-yellow-700 text-xs sm:text-sm font-bold rounded-xl border border-yellow-200 shadow-sm">
+                🚧 Робота над помилками
+             </span>
           </div>
         )}
+
+        <div className="space-y-4">
+          {visibleQuestions.map((q) => {
+            const userAnswer = answers[q.id];
+            return (
+              <div key={q.id} className="glass-panel p-4 shadow-sm border border-white/60">
+                <div className="flex gap-3 mb-4">
+                  {/* Номер питання беремо з оригінального масиву, щоб він не змінювався */}
+                  <span className="shrink-0 w-7 h-7 flex items-center justify-center bg-primary/10 text-primary text-[11px] font-bold rounded-lg">
+                    {questions.indexOf(q) + 1}
+                  </span>
+                  <p className="font-semibold text-textMain text-sm leading-snug">{q.content}</p>
+                </div>
+
+                <div className="space-y-2">
+                  {q.shuffledOptions.map((opt, oIdx) => {
+                    const isCorrect = opt === q.correct_answer;
+                    const isSelected = userAnswer?.chosen_answer === opt;
+                    
+                    let style = "w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition-all ";
+                    if (showAllCorrect && isCorrect) {
+                      style += "bg-emerald-50 border-emerald-500 text-emerald-700 font-bold ring-1 ring-emerald-500";
+                    } else if (userAnswer) {
+                      if (isCorrect) style += "bg-emerald-50 border-emerald-500 text-emerald-700 font-bold";
+                      else if (isSelected) style += "bg-red-50 border-red-500 text-red-700";
+                      else style += "opacity-50 border-gray-100 bg-gray-50";
+                    } else {
+                      style += "bg-white border-gray-100 hover:border-primary active:bg-gray-50";
+                    }
+
+                    return (
+                      <button 
+                        key={oIdx} 
+                        disabled={!!userAnswer || showAllCorrect} 
+                        onClick={() => handleAnswer(q.id, opt, q.correct_answer)} 
+                        className={style}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
-
-// Додаємо імпорт Trophy для красивого фінального екрану
-import { Trophy } from 'lucide-react';
