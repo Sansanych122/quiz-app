@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { LogIn, UserPlus, AlertCircle } from 'lucide-react';
 
 export default function AuthPage() {
@@ -12,6 +14,18 @@ export default function AuthPage() {
   const [passwordRepeat, setPasswordRepeat] = useState('');
   const [nickname, setNickname] = useState('');
 
+  // ДОДАЄМО НАВІГАЦІЮ ТА КОНТЕКСТ
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Якщо користувач вже залогінений (наприклад, після рефрешу або успішного входу), 
+  // автоматично перекидаємо його на головну
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
   // Обробка входу через Email/Пароль
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,6 +36,10 @@ export default function AuthPage() {
       if (isLogin) {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
+        
+        // ДОДАЄМО ПЕРЕХІД ПІСЛЯ УСПІШНОГО ВХОДУ
+        navigate('/'); 
+
       } else {
         if (password !== passwordRepeat) throw new Error('Паролі не співпадають');
         if (nickname.trim().length < 3) throw new Error('Нікнейм має містити мінімум 3 символи');
@@ -32,6 +50,9 @@ export default function AuthPage() {
           options: { data: { nickname: nickname.trim() } },
         });
         if (signUpError) throw signUpError;
+        
+        // ДОДАЄМО ПЕРЕХІД ПІСЛЯ УСПІШНОЇ РЕЄСТРАЦІЇ
+        navigate('/');
       }
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Невірний email або пароль' : err.message);

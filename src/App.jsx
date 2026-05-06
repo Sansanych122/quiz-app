@@ -1,54 +1,77 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+// Імпорт всіх сторінок
 import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import CoursePage from './pages/CoursePage';
-import QuizPage from './pages/QuizPage'; // ДОДАЛИ ІМПОРТ
+import QuizPage from './pages/QuizPage';
+import AddCoursePage from './pages/AddCoursePage';
 
-const ProtectedRoute = ({ children }) => {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/auth" replace />;
+// Компонент для захисту приватних маршрутів (тільки для авторизованих)
+const PrivateRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-primary font-medium">Завантаження...</div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" />;
+  }
+  
   return children;
 };
 
-export default function App() {
-  const { user } = useAuth();
-
+function App() {
   return (
-    <Routes>
-      <Route 
-        path="/auth" 
-        element={user ? <Navigate to="/" replace /> : <AuthPage />} 
-      />
-      
-      <Route 
-        path="/" 
-        element={
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/course/:courseId" 
-        element={
-          <ProtectedRoute>
-            <CoursePage />
-          </ProtectedRoute>
-        } 
-      />
+    <AuthProvider>
+      {/* Ми прибрали <Router> звідси, бо він вже є у main.jsx */}
+      <Routes>
+        {/* Публічний маршрут */}
+        <Route path="/auth" element={<AuthPage />} />
 
-      {/* ПІДКЛЮЧИЛИ РЕАЛЬНУ СТОРІНКУ ТЕСТУВАННЯ */}
-      <Route 
-        path="/section/:sectionId" 
-        element={
-          <ProtectedRoute>
-            <QuizPage />
-          </ProtectedRoute>
-        } 
-      />
-    </Routes>
+        {/* Приватні маршрути */}
+        <Route 
+          path="/" 
+          element={
+            <PrivateRoute>
+              <HomePage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/add-course" 
+          element={
+            <PrivateRoute>
+              <AddCoursePage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/course/:courseId" 
+          element={
+            <PrivateRoute>
+              <CoursePage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/section/:sectionId" 
+          element={
+            <PrivateRoute>
+              <QuizPage />
+            </PrivateRoute>
+          } 
+        />
+      </Routes>
+    </AuthProvider>
   );
 }
+
+export default App;
