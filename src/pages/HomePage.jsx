@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BookOpen, Trophy, Send, Coffee, ChevronRight, Activity, PlusCircle } from 'lucide-react';
+import { LogOut, BookOpen, Trophy, Send, Coffee, ChevronRight, Activity, PlusCircle, Sparkles, Medal } from 'lucide-react';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -23,9 +23,6 @@ export default function HomePage() {
           .single();
         if (profileData) setProfile(profileData);
 
-        // Отримуємо публічні курси ТА приватні курси цього користувача
-        // Якщо у таблиці courses ще немає поля user_id, цей запит може видати помилку.
-        // Поки що залишаємо як було, але згодом додамо: .or(`is_public.eq.true,user_id.eq.${user.id}`)
         const { data: coursesData } = await supabase
           .from('courses')
           .select('*')
@@ -56,117 +53,176 @@ export default function HomePage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
       <div className="animate-pulse flex flex-col items-center gap-4 text-primary">
         <Activity size={32} className="animate-spin" />
-        <span className="font-medium">Завантаження даних...</span>
+        <span className="font-medium tracking-wide">Завантаження простору...</span>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden pb-12">
-      <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-primary/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70"></div>
+    <div className="min-h-screen bg-[#f8fafc] relative overflow-hidden pb-16 font-sans">
+      {/* Декоративні фонові елементи (Soft Blobs) */}
+      <div className="absolute top-[-5%] right-[-5%] w-[500px] h-[500px] bg-blue-400/10 rounded-full mix-blend-multiply filter blur-[80px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-400/10 rounded-full mix-blend-multiply filter blur-[100px] pointer-events-none"></div>
       
-      <div className="max-w-4xl mx-auto px-4 pt-6 relative z-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 relative z-10">
         
-        {/* ВЕРХНЯ ПАНЕЛЬ: Привітання + Кнопки контактів/виходу */}
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-surface backdrop-blur-md p-5 rounded-2xl border border-white/40 shadow-sm">
-          <div>
-            <h1 className="text-2xl font-bold text-textMain tracking-tight">
-              Привіт, {profile?.nickname || 'Студент'}! 👋
+        {/* ВЕРХНЯ ПАНЕЛЬ (Hero Section) */}
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10 bg-white/70 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] border border-white shadow-sm transition-all hover:shadow-md">
+          <div className="flex-1">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500 mb-2">
+              Привіт, {profile?.nickname || 'Студент'}! <span className="text-black inline-block animate-wave">👋</span>
             </h1>
-            <p className="text-sm text-textMuted mt-1">Твій особистий простір для навчання</p>
+            <p className="text-slate-500 font-medium">Твій особистий простір для ефективного навчання</p>
           </div>
           
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <a href="https://t.me/smyk_oleksandr" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-xs font-bold transition-colors">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <a href="https://t.me/smyk_oleksandr" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-full text-sm font-bold transition-all duration-300 shadow-sm hover:shadow-blue-200">
               <Send size={16} /> <span className="hidden sm:inline">Розробник</span>
             </a>
-            <a href="https://www.privat24.ua/send/jlhil" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-xl text-xs font-bold transition-colors">
+            <a href="https://www.privat24.ua/send/jlhil" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-orange-50 text-orange-500 hover:bg-orange-500 hover:text-white rounded-full text-sm font-bold transition-all duration-300 shadow-sm hover:shadow-orange-200">
               <Coffee size={16} /> <span className="hidden sm:inline">Підтримати</span>
             </a>
-            <button onClick={handleLogout} className="p-2 text-textMuted hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Вийти">
-              <LogOut size={20} />
+            <button onClick={handleLogout} className="p-3 text-slate-400 hover:text-white hover:bg-red-500 rounded-full transition-all duration-300 shadow-sm bg-white border border-slate-100" title="Вийти">
+              <LogOut size={18} />
             </button>
           </div>
         </header>
 
-        <div className="space-y-8">
+        {/* СІТКА КОНТЕНТУ */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* БЛОК 1: ДОДАТИ НОВИЙ КУРС */}
-          <section>
-            <div onClick={() => navigate('/add-course')} className="glass-panel p-6 border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center text-center group h-32">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <PlusCircle size={24} />
+          {/* ЛІВА ЧАСТИНА (Курси) */}
+          <div className="lg:col-span-2 space-y-10">
+            
+            {/* ДОДАТИ НОВИЙ КУРС */}
+            <section>
+              <div 
+                onClick={() => navigate('/add-course')} 
+                className="group relative overflow-hidden bg-gradient-to-br from-blue-50/50 to-indigo-50/50 p-8 rounded-[2rem] border-2 border-dashed border-blue-200 hover:border-blue-500 hover:bg-blue-50/80 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center text-center shadow-sm hover:shadow-md"
+              >
+                <div className="absolute top-0 left-0 w-full h-full bg-white opacity-0 group-hover:opacity-40 transition-opacity duration-300 pointer-events-none"></div>
+                <div className="w-16 h-16 rounded-2xl bg-white shadow-sm text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 border border-blue-100">
+                  <PlusCircle size={32} />
+                </div>
+                <h2 className="text-lg font-bold text-slate-800 group-hover:text-blue-700 transition-colors">Створити новий курс</h2>
+                <p className="text-sm text-slate-500 mt-2 font-medium">Завантажте свій файл з тестами (.txt, .pdf, .docx)</p>
               </div>
-              <h2 className="text-base font-bold text-textMain group-hover:text-primary transition-colors">Створити новий курс</h2>
-              <p className="text-xs text-textMuted mt-1">Завантажте свій файл з тестами (.txt, .pdf, .docx)</p>
-            </div>
-          </section>
+            </section>
 
-          {/* БЛОК 2: ДОСТУПНІ КУРСИ */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpen className="text-primary" size={24} />
-              <h2 className="text-xl font-semibold text-textMain">Доступні курси</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {courses.length === 0 ? (
-                <div className="col-span-full glass-panel p-8 text-center text-textMuted">Курсів поки немає.</div>
-              ) : (
-                courses.map((course) => (
-                  <div key={course.id} className="glass-panel p-5 group hover:shadow-md transition-all flex flex-col">
-                    <h3 className="font-semibold text-base text-textMain mb-1 line-clamp-2">{course.title}</h3>
-                    <p className="text-xs text-textMuted mb-4 flex-grow">{course.description}</p>
-                    <button onClick={() => navigate(`/course/${course.id}`)} className="w-full py-2 bg-gray-50 text-textMain hover:bg-primary hover:text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-gray-100">
-                      Відкрити <ChevronRight size={16} />
-                    </button>
+            {/* ДОСТУПНІ КУРСИ */}
+            <section>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+                    <BookOpen size={20} />
                   </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* БЛОК 3: РЕЙТИНГ */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="text-yellow-500" size={24} />
-              <h2 className="text-xl font-semibold text-textMain">Рейтинг студентів</h2>
-            </div>
-            
-            <div className="glass-panel p-1">
-              {leaderboard.length === 0 ? (
-                <div className="p-6 text-center text-textMuted text-sm">Поки немає статистики.</div>
-              ) : (
-                <ul className="divide-y divide-gray-100/50">
-                  {leaderboard.map((u, index) => {
-                    const percent = u.total_answers > 0 ? Math.round((u.correct_answers / u.total_answers) * 100) : 0;
-                    return (
-                      <li key={index} className="p-3.5 flex items-center justify-between hover:bg-white/40 transition-colors first:rounded-t-xl last:rounded-b-xl">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : index === 1 ? 'bg-gray-200 text-gray-700' : index === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-400'}`}>
-                            {index + 1}
-                          </span>
-                          <div>
-                            <p className="font-medium text-textMain text-sm">{u.nickname}</p>
-                            <p className="text-[10px] text-textMuted uppercase tracking-wide">Пройдено: {u.total_answers}</p>
-                          </div>
+                  <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Доступні курси</h2>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {courses.length === 0 ? (
+                  <div className="col-span-full bg-white/60 backdrop-blur-md p-10 rounded-[2rem] border border-white text-center text-slate-500 font-medium shadow-sm">
+                    Курсів поки немає. Станьте першим, хто створить!
+                  </div>
+                ) : (
+                  courses.map((course) => (
+                    <div key={course.id} className="bg-white/80 backdrop-blur-xl p-6 rounded-[2rem] border border-white/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col group relative overflow-hidden">
+                      {/* Декоративний градієнт в кутку картки */}
+                      <div className="absolute -right-6 -top-6 w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500"></div>
+                      
+                      <div className="relative z-10 flex-grow">
+                        <div className="flex items-center gap-2 mb-3">
+                           <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold uppercase tracking-wider">Публічний</span>
                         </div>
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-100">
-                          {percent}%
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </section>
+                        <h3 className="font-bold text-lg text-slate-800 mb-2 leading-tight group-hover:text-blue-600 transition-colors">{course.title}</h3>
+                        <p className="text-sm text-slate-500 mb-6 line-clamp-2">{course.description}</p>
+                      </div>
+                      
+                      <button onClick={() => navigate(`/course/${course.id}`)} className="relative z-10 w-full py-3 bg-slate-50 hover:bg-blue-600 text-slate-700 hover:text-white rounded-xl text-sm font-bold transition-colors duration-300 flex items-center justify-center gap-2 border border-slate-100 hover:border-blue-600">
+                        Відкрити курс <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* ПРАВА ЧАСТИНА (Рейтинг) */}
+          <div className="lg:col-span-1">
+            <section className="sticky top-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-yellow-100 text-yellow-600 rounded-xl">
+                  <Trophy size={20} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Топ студентів</h2>
+              </div>
+              
+              <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-lg overflow-hidden">
+                {leaderboard.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-sm font-medium">Поки немає статистики.</div>
+                ) : (
+                  <ul className="divide-y divide-slate-100/80">
+                    {leaderboard.map((u, index) => {
+                      const percent = u.total_answers > 0 ? Math.round((u.correct_answers / u.total_answers) * 100) : 0;
+                      
+                      // Візуальне виділення Топ-3
+                      const isTop1 = index === 0;
+                      const isTop2 = index === 1;
+                      const isTop3 = index === 2;
+                      
+                      return (
+                        <li key={index} className={`p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors ${isTop1 ? 'bg-gradient-to-r from-yellow-50/50 to-transparent' : ''}`}>
+                          <div className="flex items-center gap-4">
+                            {/* Значок місця */}
+                            {isTop1 ? (
+                               <div className="w-8 h-8 flex items-center justify-center bg-yellow-100 text-yellow-600 rounded-full shadow-sm border border-yellow-200"><Medal size={18} /></div>
+                            ) : isTop2 ? (
+                               <div className="w-8 h-8 flex items-center justify-center bg-slate-200 text-slate-600 rounded-full shadow-sm border border-slate-300"><Medal size={18} /></div>
+                            ) : isTop3 ? (
+                               <div className="w-8 h-8 flex items-center justify-center bg-orange-100 text-orange-600 rounded-full shadow-sm border border-orange-200"><Medal size={18} /></div>
+                            ) : (
+                               <div className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-400 rounded-full text-xs font-bold border border-slate-100">{index + 1}</div>
+                            )}
+                            
+                            <div>
+                              <p className={`text-sm ${isTop1 ? 'font-extrabold text-slate-900' : 'font-bold text-slate-700'}`}>{u.nickname}</p>
+                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">Відповідей: {u.total_answers}</p>
+                            </div>
+                          </div>
+                          
+                          {/* Відсоток */}
+                          <div className={`px-3 py-1 rounded-lg text-xs font-extrabold border ${percent >= 70 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : percent >= 40 ? 'bg-yellow-50 text-yellow-600 border-yellow-100' : 'bg-red-50 text-red-500 border-red-100'}`}>
+                            {percent}%
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </section>
+          </div>
 
         </div>
       </div>
+      
+      {/* CSS для анімації привітання */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes wave {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-15deg); }
+          75% { transform: rotate(15deg); }
+        }
+        .animate-wave {
+          animation: wave 2s infinite;
+          transform-origin: 70% 70%;
+        }
+      `}} />
     </div>
   );
 }
