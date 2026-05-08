@@ -1,55 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, FileText, Loader2, CheckCircle2, XCircle, Database } from 'lucide-react';
+import { ArrowLeft, UploadCloud, FileText, Loader2, CheckCircle2, XCircle, Database, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext'; // Додали для отримання ID юзера
+
+// Адреса нашого локального Python-сервера
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 export default function AddCoursePage() {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Отримуємо поточного користувача
   
   // Стани сторінки: 'form' -> 'parsing' -> 'result'
   const [step, setStep] = useState('form');
   
   const [courseName, setCourseName] = useState('');
   const [file, setFile] = useState(null);
+  
   const [parseStatus, setParseStatus] = useState('Ініціалізація...');
   const [parseProgress, setParseProgress] = useState(0);
-  const [parsedQuestionsCount, setParsedQuestionsCount] = useState(0);
+  
+  // Зберігаємо результати з бекенда
+  const [parsedQuestions, setParsedQuestions] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Обробка вибору файлу
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
     }
   };
 
-  // Імітація відправки на Python-сервер
-  const handleStartParsing = (e) => {
+  // ЕТАП 1: ВІДПРАВКА НА /parse
+  const handleStartParsing = async (e) => {
     e.preventDefault();
     if (!courseName.trim() || !file) return;
     
     setStep('parsing');
-    setParseProgress(10);
-    setParseStatus('Підключення до сервера парсингу...');
+    setParseProgress(20);
+    setParseStatus('Відправка файлу на сервер...');
 
-    // ІМІТАЦІЯ ПРОЦЕСУ (згодом тут буде fetch на FastAPI)
-    setTimeout(() => { setParseProgress(30); setParseStatus('Зчитування тексту з файлу...'); }, 1500);
-    setTimeout(() => { setParseProgress(60); setParseStatus('Пошук питань та варіантів відповідей за регулярними виразами...'); }, 3500);
-    setTimeout(() => { setParseProgress(85); setParseStatus('Валідація знайдених тестів...'); }, 6000);
-    setTimeout(() => { 
-      setParseProgress(100); 
+    try {
+      // Формуємо FormData для відправки файлу
+      const formData = new FormData();
+      formData.append('course_name', courseName);
+      formData.append('file', file);
+
+      setParseProgress(50);
+      setParseStatus('Парсинг тексту та пошук питань...');
+
+      const response = await fetch(`${API_BASE_URL}/parse`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Помилка обробки файлу');
+      }
+
+      const data = await response.json();
+      
+      setParseProgress(100);
       setParseStatus('Готово!');
-      setParsedQuestionsCount(Math.floor(Math.random() * 100) + 50); // Випадкове число від 50 до 150
+      
+      // Зберігаємо всі питання в локальний стейт
+      setParsedQuestions(data.questions);
       setStep('result');
-    }, 7500);
+
+    } catch (error) {
+      alert(`Помилка: ${error.message}`);
+      setStep('form'); // Повертаємо на форму у разі помилки
+    }
   };
 
-  // Підтвердження збереження
+  // ЕТАП 2: ПІДТВЕРДЖЕННЯ І ВІДПРАВКА НА /save
   const handleConfirmSave = async () => {
-    // Згодом тут буде запит до Supabase для збереження курсу та питань
-    alert(`Курс "${courseName}" з ${parsedQuestionsCount} тестами успішно збережено у базу!`);
-    navigate('/');
+    if (!user) {
+      alert("Помилка авторизації. Спробуйте перезайти в акаунт.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        course_name: courseName,
+        creator_id: user.id, // Передаємо ID автора
+        questions: parsedQuestions
+      };
+
+      const response = await fetch(`${API_BASE_URL}/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Помилка збереження в БД');
+      }
+
+      // Якщо все супер - вітаємо і кидаємо на головну!
+      navigate('/');
+      
+    } catch (error) {
+      alert(`Помилка запису: ${error.message}`);
+      setIsSaving(false);
+    }
   };
 
-  // Скасування
   const handleCancel = () => {
     if (window.confirm('Ви впевнені, що хочете скасувати? Дані не будуть збережені.')) {
       navigate('/');
@@ -72,7 +131,7 @@ export default function AddCoursePage() {
         
         {/* КРОК 1: ФОРМА */}
         {step === 'form' && (
-          <form onSubmit={handleStartParsing} className="glass-panel p-6 space-y-6">
+          <form onSubmit={handleStartParsing} className="glass-panel p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4">
             <div>
               <label className="block text-sm font-bold text-textMain mb-2">Назва курсу</label>
               <input 
@@ -91,7 +150,7 @@ export default function AddCoursePage() {
                 <input 
                   type="file" 
                   required
-                  accept=".txt,.pdf,.docx"
+                  accept=".txt"
                   onChange={handleFileChange}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
@@ -99,7 +158,7 @@ export default function AddCoursePage() {
                   <div className="text-center">
                     <UploadCloud size={32} className="mx-auto text-gray-400 mb-2" />
                     <p className="text-sm font-medium text-textMain">Натисніть або перетягніть файл сюди</p>
-                    <p className="text-xs text-textMuted mt-1">Підтримуються .txt, .pdf, .docx</p>
+                    <p className="text-xs text-textMuted mt-1">Поки підтримується тільки .txt</p>
                   </div>
                 ) : (
                   <div className="text-center">
@@ -126,7 +185,7 @@ export default function AddCoursePage() {
             
             <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-primary transition-all duration-500 ease-out"
+                className="h-full bg-primary transition-all duration-300 ease-out"
                 style={{ width: `${parseProgress}%` }}
               ></div>
             </div>
@@ -136,8 +195,8 @@ export default function AddCoursePage() {
 
         {/* КРОК 3: РЕЗУЛЬТАТ І ПІДТВЕРДЖЕННЯ */}
         {step === 'result' && (
-          <div className="glass-panel p-8 text-center">
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="glass-panel p-8 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
               <CheckCircle2 size={32} className="text-emerald-600" />
             </div>
             
@@ -146,20 +205,36 @@ export default function AddCoursePage() {
               Ми успішно знайшли та структурували тести з вашого файлу.
             </p>
 
-            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mb-8 inline-block min-w-[200px]">
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mb-8 inline-block min-w-[200px] shadow-sm">
               <p className="text-xs text-textMuted uppercase tracking-wider mb-1">Знайдено тестів</p>
-              <p className="text-3xl font-black text-primary">{parsedQuestionsCount}</p>
+              <p className="text-4xl font-black text-primary">{parsedQuestions.length}</p>
             </div>
 
-            <p className="text-xs text-orange-600 font-medium mb-6 bg-orange-50 p-3 rounded-lg border border-orange-100">
-              ⚠️ Дані ще не збережені. Перевірте кількість знайдених тестів. Якщо цифра виглядає підозріло малою — скасуйте і перевірте форматування у файлі.
-            </p>
+            {parsedQuestions.length === 0 ? (
+               <p className="text-sm text-red-600 font-medium mb-6 bg-red-50 p-4 rounded-xl border border-red-100">
+                 На жаль, ми не знайшли жодного питання. Перевірте, чи ваш файл відповідає правильному формату нумерації (1. , 2. ) та варіантів (А. , Б. ).
+               </p>
+            ) : (
+               <p className="text-xs text-orange-600 font-medium mb-6 bg-orange-50 p-4 rounded-xl border border-orange-100 flex gap-2 text-left">
+                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                 <span>Дані ще не збережені. Перевірте кількість знайдених тестів. Якщо цифра виглядає підозріло малою — скасуйте і перевірте форматування у файлі.</span>
+               </p>
+            )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={handleConfirmSave} className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-2">
-                <CheckCircle2 size={18} /> Зберегти у базу
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <button 
+                onClick={handleConfirmSave} 
+                disabled={parsedQuestions.length === 0 || isSaving}
+                className="flex-1 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />} 
+                {isSaving ? 'Збереження...' : 'Зберегти у базу'}
               </button>
-              <button onClick={handleCancel} className="flex-1 py-3 bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-textMain rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+              <button 
+                onClick={handleCancel} 
+                disabled={isSaving}
+                className="flex-1 py-3.5 bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-textMain rounded-xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
                 <XCircle size={18} /> Скасувати
               </button>
             </div>
