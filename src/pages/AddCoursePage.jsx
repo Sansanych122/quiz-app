@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+// Якщо є змінна середовища - використовуємо її, якщо ні - падаємо на локальний сервер
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export default function AddCoursePage() {
   const navigate = useNavigate();
