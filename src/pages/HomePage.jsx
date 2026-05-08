@@ -126,7 +126,7 @@ export default function HomePage() {
                   <PlusCircle size={32} />
                 </div>
                 <h2 className="text-lg font-bold text-slate-800 group-hover:text-blue-700 transition-colors">Створити новий курс</h2>
-                <p className="text-sm text-slate-500 mt-2 font-medium">Завантажте свій файл з тестами (.txt)</p>
+                <p className="text-sm text-slate-500 mt-2 font-medium">Завантажте свій файл з тестами (.txt, .pdf, .docx)</p>
               </div>
             </section>
 
