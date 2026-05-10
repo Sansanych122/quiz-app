@@ -13,7 +13,10 @@ import {
 } from 'lucide-react';
 
 export default function CoursePage() {
-  const { id } = useParams();
+  // Витягуємо всі параметри і беремо той, що існує (id або courseId)
+  const params = useParams();
+  const actualId = params.id || params.courseId; 
+
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -24,12 +27,18 @@ export default function CoursePage() {
 
   useEffect(() => {
     const fetchCourseData = async () => {
+      // Захист від пустих запитів
+      if (!actualId || actualId === 'undefined') {
+        setLoading(false);
+        return; 
+      }
+
       try {
         // 1. Завантажуємо інформацію про курс
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select('*')
-          .eq('id', id)
+          .eq('id', actualId)
           .single();
           
         if (courseError) throw courseError;
@@ -39,7 +48,7 @@ export default function CoursePage() {
         const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
           .select('*')
-          .eq('course_id', id);
+          .eq('course_id', actualId);
           
         if (questionsError) throw questionsError;
         setQuestions(questionsData);
@@ -52,7 +61,7 @@ export default function CoursePage() {
     };
 
     fetchCourseData();
-  }, [id]);
+  }, [actualId]);
 
   // Функція видалення курсу
   const handleDeleteCourse = async () => {
@@ -105,7 +114,7 @@ export default function CoursePage() {
         <AlertTriangle size={48} className="text-amber-500 mb-4" />
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Курс не знайдено</h2>
         <p className="text-slate-500 mb-6">Можливо, він був видалений або посилання недійсне.</p>
-        <button onClick={() => navigate('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold">
+        <button onClick={() => navigate('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold transition-transform hover:scale-105">
           На головну
         </button>
       </div>
@@ -171,7 +180,7 @@ export default function CoursePage() {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <button 
-              onClick={() => navigate(`/test/${course.id}`)} // Заміни на свій роут проходження тесту
+              onClick={() => navigate(`/test/${course.id}`)}
               disabled={questions.length === 0}
               className="flex-1 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-lg shadow-blue-500/25 flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
