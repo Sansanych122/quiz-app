@@ -17,11 +17,15 @@ const shuffleArray = (array) => {
 };
 
 export default function QuizPage() {
-  const { sectionId } = useParams();
+  // ТЕПЕР МИ ОТРИМУЄМО ОБИДВА ПАРАМЕТРИ З URL
+  const { courseId, sectionId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [section, setSection] = useState(null);
+  // Замість section зберігаємо універсальні дані для шапки та кнопки "Назад"
+  const [quizTitle, setQuizTitle] = useState('Завантаження...');
+  const [returnCourseId, setReturnCourseId] = useState(null);
+  
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({}); 
   const [loading, setLoading] = useState(true);
@@ -29,29 +33,65 @@ export default function QuizPage() {
   
   const [showAllCorrect, setShowAllCorrect] = useState(false);
   const [mistakesOnlyMode, setMistakesOnlyMode] = useState(false);
-  const [targetMistakeIds, setTargetMistakeIds] = useState([]); // Запам'ятовуємо, які саме тести були завалені
+  const [targetMistakeIds, setTargetMistakeIds] = useState([]);
 
   useEffect(() => {
     fetchQuizData();
-  }, [sectionId, user.id]);
+  }, [courseId, sectionId, user.id]);
 
   const fetchQuizData = async () => {
     setLoading(true);
     try {
-      const { data: secData } = await supabase
-        .from('sections').select('title, course_id').eq('id', sectionId).single();
-      setSection(secData);
+      let fetchedQuestions = [];
+      let headerTitle = '';
+      let backId = '';
 
-      const { data: qData } = await supabase
-        .from('questions').select('*').eq('section_id', sectionId).order('created_at', { ascending: true });
+      // СЦЕНАРІЙ 1: Тестуємо КОНКРЕТНИЙ РОЗДІЛ
+      if (sectionId) {
+        const { data: secData } = await supabase
+          .from('sections').select('title, course_id').eq('id', sectionId).single();
+          
+        headerTitle = secData?.title || 'Тест розділу';
+        backId = secData?.course_id;
 
-      const prepared = (qData || []).map(q => ({
+        const { data: qData } = await supabase
+          .from('questions').select('*').eq('section_id', sectionId).order('created_at', { ascending: true });
+        
+        fetchedQuestions = qData || [];
+      } 
+      // СЦЕНАРІЙ 2: Тестуємо ВЕСЬ КУРС
+      else if (courseId) {
+        const { data: courseData } = await supabase
+          .from('courses').select('title, id').eq('id', courseId).single();
+          
+        headerTitle = `${courseData?.title || 'Курс'} (Всі питання)`;
+        backId = courseId;
+
+        // Спочатку знаходимо всі розділи цього курсу
+        const { data: sectionsData } = await supabase
+          .from('sections').select('id').eq('course_id', courseId);
+          
+        const sectionIds = sectionsData?.map(s => s.id) || [];
+        
+        if (sectionIds.length > 0) {
+          // Підтягуємо питання з УСІХ розділів
+          const { data: qData } = await supabase
+            .from('questions').select('*').in('section_id', sectionIds).order('created_at', { ascending: true });
+          fetchedQuestions = qData || [];
+        }
+      }
+
+      setQuizTitle(headerTitle);
+      setReturnCourseId(backId);
+
+      const prepared = fetchedQuestions.map(q => ({
         ...q,
         shuffledOptions: shuffleArray(q.options)
       }));
       
       setQuestions(prepared);
 
+      // Завантажуємо відповіді користувача
       const { data: aData } = await supabase
         .from('user_answers').select('question_id, is_correct, chosen_answer').eq('user_id', user.id);
       
@@ -89,36 +129,44 @@ export default function QuizPage() {
   };
 
   const resetProgress = async () => {
-    if (!window.confirm('Очистити весь прогрес цього розділу?')) return;
+    if (!window.confirm('Очистити весь прогрес цього тестування?')) return;
     setResetting(true);
     const qIds = questions.map(q => q.id);
-    await supabase.from('user_answers').delete().eq('user_id', user.id).in('question_id', qIds);
+    
+    // Щоб не перевищити ліміти бази даних на довгі запити, розбиваємо масив ID (якщо питань дуже багато)
+    const chunkSize = 500;
+    for (let i = 0; i < qIds.length; i += chunkSize) {
+      const chunk = qIds.slice(i, i + chunkSize);
+      await supabase.from('user_answers').delete().eq('user_id', user.id).in('question_id', chunk);
+    }
+    
     setAnswers({});
     setMistakesOnlyMode(false);
     setShowAllCorrect(false);
     setResetting(false);
   };
 
-  // Перемикач режиму "Робота над помилками"
   const toggleMistakesMode = async () => {
     if (mistakesOnlyMode) {
-      // Виходимо з режиму і показуємо всі тести
       setMistakesOnlyMode(false);
       return;
     }
 
-    // Знаходимо тільки ті тести, які були завалені
     const incorrectIds = Object.entries(answers)
       .filter(([id, ans]) => !ans.is_correct && questions.some(q => q.id === id))
       .map(([id]) => id);
 
-    if (incorrectIds.length === 0) return alert('У вас немає завалених тестів у цьому розділі!');
+    if (incorrectIds.length === 0) return alert('У вас немає завалених тестів!');
     
     if (!window.confirm('Розпочати роботу над помилками? Завалені тести будуть очищені, щоб ви могли пройти їх знову.')) return;
     
     setResetting(true);
-    // Видаляємо з бази тільки завалені відповіді, даючи другий шанс
-    await supabase.from('user_answers').delete().eq('user_id', user.id).in('question_id', incorrectIds);
+    
+    const chunkSize = 500;
+    for (let i = 0; i < incorrectIds.length; i += chunkSize) {
+      const chunk = incorrectIds.slice(i, i + chunkSize);
+      await supabase.from('user_answers').delete().eq('user_id', user.id).in('question_id', chunk);
+    }
     
     setAnswers(prev => {
       const next = { ...prev };
@@ -126,23 +174,21 @@ export default function QuizPage() {
       return next;
     });
     
-    setTargetMistakeIds(incorrectIds); // Запам'ятовуємо їх, щоб показати тільки їх
+    setTargetMistakeIds(incorrectIds); 
     setMistakesOnlyMode(true);
     setShowAllCorrect(false);
     setResetting(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Фільтруємо питання для відображення
   const visibleQuestions = useMemo(() => {
     if (mistakesOnlyMode) {
-      // Показуємо ТІЛЬКИ ті питання, які були у списку завалених
       return questions.filter(q => targetMistakeIds.includes(q.id));
     }
     return questions;
   }, [questions, mistakesOnlyMode, targetMistakeIds]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={40} /></div>;
+  if (loading || resetting) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={40} /></div>;
 
   const answeredCount = Object.keys(answers).filter(id => questions.some(q => q.id === id)).length;
   const correctCount = Object.values(answers).filter(a => a.is_correct && questions.some(q => q.id === Object.keys(answers).find(k => answers[k] === a))).length;
@@ -160,7 +206,7 @@ export default function QuizPage() {
             
             {/* ЛІВА ЧАСТИНА: Назад + Статистика */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-1.5 sm:pr-2 border-r border-gray-200">
-              <button onClick={() => navigate(`/course/${section?.course_id}`)} className="p-1 sm:p-1.5 text-textMuted hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => navigate(`/course/${returnCourseId}`)} className="p-1 sm:p-1.5 text-textMuted hover:bg-gray-100 rounded-lg transition-colors">
                 <ArrowLeft size={18} />
               </button>
               
@@ -172,7 +218,7 @@ export default function QuizPage() {
               </div>
             </div>
 
-            {/* ПРАВА ЧАСТИНА: 4 компактні кнопки без скролу */}
+            {/* ПРАВА ЧАСТИНА */}
             <div className="flex items-center justify-end gap-1 sm:gap-1.5 flex-1">
               
               {/* Змішати */}
@@ -219,13 +265,13 @@ export default function QuizPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
-        <h1 className="text-center text-sm font-bold text-textMuted mb-2 sm:mb-3">{section?.title}</h1>
+        <h1 className="text-center text-sm font-bold text-textMuted mb-2 sm:mb-3">{quizTitle}</h1>
         
         {/* ІНДИКАТОР РЕЖИМУ РОБОТИ НАД ПОМИЛКАМИ */}
         {mistakesOnlyMode && (
           <div className="text-center mb-4 sm:mb-6">
              <span className="inline-block px-4 py-1.5 bg-yellow-100 text-yellow-700 text-xs sm:text-sm font-bold rounded-xl border border-yellow-200 shadow-sm">
-                🚧 Робота над помилками
+               🚧 Робота над помилками
              </span>
           </div>
         )}
@@ -236,7 +282,6 @@ export default function QuizPage() {
             return (
               <div key={q.id} className="glass-panel p-4 shadow-sm border border-white/60">
                 <div className="flex gap-3 mb-4">
-                  {/* Номер питання беремо з оригінального масиву, щоб він не змінювався */}
                   <span className="shrink-0 w-7 h-7 flex items-center justify-center bg-primary/10 text-primary text-[11px] font-bold rounded-lg">
                     {questions.indexOf(q) + 1}
                   </span>

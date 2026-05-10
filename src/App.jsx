@@ -15,8 +15,8 @@ const PrivateRoute = ({ children }) => {
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-primary font-medium">Завантаження...</div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-blue-600 font-medium">Завантаження...</div>
       </div>
     );
   }
@@ -61,8 +61,21 @@ function App() {
             </PrivateRoute>
           } 
         />
+        
+        {/* === ВИПРАВЛЕНІ МАРШРУТИ ДЛЯ ТЕСТІВ === */}
+        {/* 1. Маршрут для проходження всього курсу */}
         <Route 
-          path="/section/:sectionId" 
+          path="/test/:courseId" 
+          element={
+            <PrivateRoute>
+              <QuizPage />
+            </PrivateRoute>
+          } 
+        />
+        
+        {/* 2. Маршрут для проходження конкретного розділу */}
+        <Route 
+          path="/test/section/:sectionId" 
           element={
             <PrivateRoute>
               <QuizPage />
