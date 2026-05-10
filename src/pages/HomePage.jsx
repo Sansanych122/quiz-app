@@ -101,7 +101,7 @@ export default function HomePage() {
             <a href="https://t.me/smyk_oleksandr" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-full text-sm font-bold transition-all duration-300 shadow-sm hover:shadow-blue-200">
               <Send size={16} /> <span className="hidden sm:inline">Розробник</span>
             </a>
-            <a href="https://send.monobank.ua/jlhil" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-orange-50 text-orange-500 hover:bg-orange-500 hover:text-white rounded-full text-sm font-bold transition-all duration-300 shadow-sm hover:shadow-orange-200">
+            <a href="https://www.privat24.ua/send/jlhil" target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-orange-50 text-orange-500 hover:bg-orange-500 hover:text-white rounded-full text-sm font-bold transition-all duration-300 shadow-sm hover:shadow-orange-200">
               <Coffee size={16} /> <span className="hidden sm:inline">Підтримати</span>
             </a>
             <button onClick={handleLogout} className="p-3 text-slate-400 hover:text-white hover:bg-red-500 rounded-full transition-all duration-300 shadow-sm bg-white border border-slate-100" title="Вийти">
