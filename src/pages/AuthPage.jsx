@@ -248,6 +248,13 @@ export default function AuthPage() {
           </p>
         </div>
 
+        {/* НОВЕ: Публічні юридичні посилання для Google OAuth */}
+        <div className="mt-6 flex justify-center items-center gap-3 text-[11px] font-medium text-slate-400 relative z-10">
+          <a href="/privacy-policy" className="hover:text-slate-600 transition-colors">Політика конфіденційності</a>
+          <span>•</span>
+          <a href="/terms-of-service" className="hover:text-slate-600 transition-colors">Умови використання</a>
+        </div>
+
       </div>
     </div>
   );
