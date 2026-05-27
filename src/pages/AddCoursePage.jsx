@@ -32,11 +32,15 @@ export default function AddCoursePage() {
   const [error, setError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // ВИПРАВЛЕНО: тепер умова коректно розрізняє 'classic' та 'ai-gen'
   const handleFileChange = (e, type) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      if (type === 'classic') setFile(selectedFile);
-      if (type === 'ai') setAiFile(selectedFile);
+      if (type === 'classic') {
+        setFile(selectedFile);
+      } else {
+        setAiFile(selectedFile);
+      }
       setError(null);
     }
   };
