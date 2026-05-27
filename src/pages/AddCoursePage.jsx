@@ -219,7 +219,7 @@ export default function AddCoursePage() {
             </button>
           </div>
 
-          {/* Зона завантаження файлу (Спільна для обох режимів, змінюється лише текст) */}
+          {/* Зона завантаження файлу */}
           <div className="mb-8">
             <label className="block text-sm font-medium text-slate-700 mb-2">
               {mode === 'classic' ? 'Файл з тестами' : 'Матеріал для аналізу (лекція, конспект)'}
@@ -242,7 +242,9 @@ export default function AddCoursePage() {
                   <span className="text-xs text-slate-500 mt-1">Натисніть, щоб змінити файл</span>
                 </div>
               )}
+              {/* key={mode} забезпечує перестворення інпуту при зміні режиму */}
               <input 
+                key={mode}
                 type="file" 
                 className="hidden" 
                 accept=".pdf,.docx,.doc,.txt" 
