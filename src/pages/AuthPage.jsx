@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, UserPlus, AlertCircle, Eye, EyeOff, Mail, Lock, User, ArrowRight, BookOpen } from 'lucide-react';
+import { LogIn, UserPlus, AlertCircle, Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -84,14 +84,16 @@ export default function AuthPage() {
         
         {/* Лого / Заголовок поверх картки */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-[1.5rem] text-white flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30 transform rotate-3">
-             <BookOpen size={32} className="-rotate-3" />
+          <div className="mb-4">
+            <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-800 drop-shadow-sm">
+              Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Quiz</span>
+            </span>
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
             {isLogin ? 'З поверненням!' : 'Створіть акаунт'}
           </h1>
           <p className="text-sm text-slate-500 mt-2 font-medium">
-            {isLogin ? 'Увійдіть, щоб продовжити навчання' : 'Приєднуйтесь до платформи UniQ'}
+            {isLogin ? 'Увійдіть, щоб продовжити навчання' : 'Твій крок до розумного навчання з AI'}
           </p>
         </div>
 
