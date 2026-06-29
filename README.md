@@ -1,16 +1,27 @@
-# React + Vite
+# UniQuiz
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Live Demo:** [uniquiz.pages.dev](https://uniquiz.pages.dev/)
 
-Currently, two official plugins are available:
+## The Problem
+Educators and students waste hours manually extracting testing materials from lectures. Parsing unstructured or poorly formatted DOCX and PDF files typically breaks standard regular expressions. Furthermore, traditional testing platforms encourage mechanical memorization rather than targeted, analytical learning.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## The Solution
+UniQuiz is an AI-powered platform that automates the generation of educational tests. It converts raw materials into interactive training modules instantly.
 
-## React Compiler
+*   **AI Generation:** Integrates the Google Gemini API to read raw lecture notes and automatically generate complex testing modules based on custom user prompts.
+*   **Smart Parsing (Human Engineering):** Bypasses the limitations of standard parsers on unformatted text. The platform asks the user to input the exact number of answer options present in their file. The backend algorithm uses this integer as a mathematical validator to perfectly slice monolithic, broken text into structured JSON.
+*   **Adaptive Learning:** Implements an error-correction algorithm that tracks user performance and dynamically generates test sessions consisting solely of previously failed questions.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Architecture & Tech Stack
+The project utilizes a decoupled microservice architecture to isolate heavy processing from UI rendering.
 
-## Expanding the ESLint configuration
+*   **Frontend:** React (Vite, Tailwind CSS). Hosted on Cloudflare Pages. Performs direct CRUD operations against the database to minimize latency.
+*   **Backend:** FastAPI (Python). An isolated microservice hosted on Render. Responsible for heavy I/O operations, binary file parsing, and LLM orchestration.
+*   **Database & Security:** PostgreSQL via Supabase. Enforces strict Row Level Security (RLS) policies at the database level to ensure complete isolation of user data and logs. Supports Google OAuth for secure SSO.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Repositories
+*   **Frontend Client:** [quiz-app](https://github.com/Sansanych122/quiz-app)
+*   **Backend API:** [uniq-parser-api](https://github.com/Sansanych122/uniq-parser-api)
+
+## Author
+Developed by Smyk Oleksandr.
