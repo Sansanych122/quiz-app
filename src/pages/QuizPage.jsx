@@ -39,7 +39,7 @@ export default function QuizPage() {
     fetchQuizData();
   }, [courseId, sectionId, user.id]);
 
-  const fetchQuizData = async () => {
+const fetchQuizData = async () => {
     setLoading(true);
     try {
       let fetchedQuestions = [];
@@ -91,14 +91,29 @@ export default function QuizPage() {
       
       setQuestions(prepared);
 
-      // Завантажуємо відповіді користувача
-      const { data: aData } = await supabase
-        .from('user_answers').select('question_id, is_correct, chosen_answer').eq('user_id', user.id);
-      
+      // Завантажуємо відповіді користувача лише для питань поточного тесту
+      const qIds = fetchedQuestions.map(q => q.id);
       const answersMap = {};
-      aData?.forEach(ans => {
-        answersMap[ans.question_id] = { is_correct: ans.is_correct, chosen_answer: ans.chosen_answer };
-      });
+
+      if (qIds.length > 0) {
+        const chunkSize = 500;
+        for (let i = 0; i < qIds.length; i += chunkSize) {
+          const chunk = qIds.slice(i, i + chunkSize);
+          const { data: aData } = await supabase
+            .from('user_answers')
+            .select('question_id, is_correct, chosen_answer')
+            .eq('user_id', user.id)
+            .in('question_id', chunk);
+
+          aData?.forEach(ans => {
+            answersMap[ans.question_id] = {
+              is_correct: ans.is_correct,
+              chosen_answer: ans.chosen_answer,
+            };
+          });
+        }
+      }
+
       setAnswers(answersMap);
 
     } catch (error) {
