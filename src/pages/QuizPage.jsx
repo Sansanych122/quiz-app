@@ -123,9 +123,15 @@ export default function QuizPage() {
     const isCorrect = option === correctAnswer;
     setAnswers(prev => ({ ...prev, [questionId]: { is_correct: isCorrect, chosen_answer: option } }));
 
-    await supabase.from('user_answers').upsert({
-      user_id: user.id, question_id: questionId, is_correct: isCorrect, chosen_answer: option
-    });
+    await supabase.from('user_answers').upsert(
+      {
+        user_id: user.id,
+        question_id: questionId,
+        is_correct: isCorrect,
+        chosen_answer: option,
+      },
+      { onConflict: 'user_id,question_id' }
+    );
   };
 
   const resetProgress = async () => {
