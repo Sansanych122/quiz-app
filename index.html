@@ -1,25 +1,79 @@
 <!doctype html>
 <html lang="uk">
   <head>
-    <meta charset="UTF-8" />    
-    
-    <link rel="icon" type="image/png" href="/icon.png" /> 
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFCEE" />
+    
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="canonical" href="https://uniquiz.pages.dev/" />
 
+    <!-- Google Verification -->
     <meta name="google-site-verification" content="QOZCNlhjh2xF5TAiI4gFMJzWk_e36vPltAuiN6gAVso" />
 
+    <!-- SEO Meta Tags -->
     <title>UniQuiz — Твій розумний AI-асистент для навчання</title>
     <meta name="description" content="UniQuiz перетворює лекції та конспекти на інтерактивні тести за допомогою штучного інтелекту. Готуйся до іспитів швидше та ефективніше." />
     <meta name="keywords" content="навчання, тести, AI генерація тестів, підготовка до іспитів, UniQuiz, розумне навчання" />
     <meta name="author" content="UniQuiz Platform" />
-    
     <meta name="robots" content="index, follow" />
 
+    <!-- Open Graph (Facebook / Telegram / LinkedIn) -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="UniQuiz" />
+    <meta property="og:locale" content="uk_UA" />
     <meta property="og:title" content="UniQuiz — Навчайся розумніше, не важче" />
-    <meta property="og:description" content="Створюй інтерактивні курси та генеруй тести за секунди за допомогою AI." />
+    <meta property="og:description" content="Створюй інтерактивні курси та генеруй тести за секунди за допомогою штучного інтелекту." />
     <meta property="og:url" content="https://uniquiz.pages.dev/" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta property="og:image" content="https://uniquiz.pages.dev/icon.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="UniQuiz — Навчайся розумніше, не важче" />
+    <meta name="twitter:description" content="Створюй інтерактивні курси та генеруй тести за секунди за допомогою AI." />
+    <meta name="twitter:image" content="https://uniquiz.pages.dev/icon.png" />
+
+    <!-- JSON-LD Structured Data for Google Rich Results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://uniquiz.pages.dev/#organization",
+          "name": "UniQuiz",
+          "url": "https://uniquiz.pages.dev",
+          "logo": "https://uniquiz.pages.dev/icon.png",
+          "description": "Розумна освітня платформа для підготовки до іспитів та генерації тестів."
+        },
+        {
+          "@type": "EducationalApplication",
+          "@id": "https://uniquiz.pages.dev/#application",
+          "name": "UniQuiz",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "All",
+          "url": "https://uniquiz.pages.dev",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "UAH"
+          },
+          "publisher": {
+            "@id": "https://uniquiz.pages.dev/#organization"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Preconnect to Font Origins (Eliminates CSS @import waterfall) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   </head>
   <body>
     <div id="root"></div>

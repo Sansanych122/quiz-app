@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, UserPlus, AlertCircle, Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { UserPlus, AlertCircle, Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import SEO from '../components/SEO';
+import { useToast } from '../components/Toast';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,40 +20,74 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
 
+  // Валідація після першого blur
+  const [touched, setTouched] = useState({});
+
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useToast();
 
   // Якщо користувач вже залогінений, перекидаємо на головну
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [user, navigate]);
+
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isPasswordValid = password.length >= 8;
+  const isPasswordRepeatValid = isLogin || (password === passwordRepeat && passwordRepeat.length > 0);
+  const isNicknameValid = isLogin || nickname.trim().length >= 3;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    // Клієнтська валідація безпеки перед запитом
+    if (!isLogin) {
+      if (nickname.trim().length < 3) {
+        setError('Нікнейм має містити мінімум 3 символи');
+        return;
+      }
+      if (password.length < 8) {
+        setError('Пароль має містити щонайменше 8 символів');
+        return;
+      }
+      if (password !== passwordRepeat) {
+        setError('Паролі не співпадають');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
-        navigate('/'); 
+        addToast({ message: 'Успішний вхід!', type: 'success' });
+        navigate('/dashboard'); 
       } else {
-        if (password !== passwordRepeat) throw new Error('Паролі не співпадають');
-        if (nickname.trim().length < 3) throw new Error('Нікнейм має містити мінімум 3 символи');
-
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { nickname: nickname.trim() } },
         });
         if (signUpError) throw signUpError;
-        navigate('/');
+        addToast({ message: 'Акаунт успішно створено!', type: 'success' });
+        navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.message === 'Invalid login credentials' ? 'Невірний email або пароль' : err.message);
+      const msg = err.message === 'Invalid login credentials' 
+        ? 'Невірний email або пароль' 
+        : err.message.includes('already registered')
+        ? 'Користувач із такою поштою вже існує'
+        : err.message;
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -64,126 +100,173 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: `${window.location.origin}/dashboard`
         }
       });
       if (error) throw error;
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Не вдалося увійти через Google');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#f8fafc] relative overflow-hidden font-sans">
-      {/* Декоративні фонові елементи (Soft Blobs) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-400/20 rounded-full mix-blend-multiply filter blur-[80px] pointer-events-none animate-pulse" style={{ animationDuration: '8s' }}></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-indigo-400/10 rounded-full mix-blend-multiply filter blur-[100px] pointer-events-none"></div>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-brand-cream relative overflow-hidden font-sans selection:bg-brand-sage/20 selection:text-brand-dark">
+      <SEO 
+        title={isLogin ? "Увійти — UniQuiz" : "Реєстрація — UniQuiz"}
+        description="Увійдіть до особистого кабінету UniQuiz або створіть новий акаунт для розумного навчання з AI."
+        canonical="https://uniquiz.pages.dev/auth"
+      />
 
       <div className="w-full max-w-md relative z-10">
         
         {/* Лого / Заголовок поверх картки */}
         <div className="text-center mb-8">
-          <div className="mb-4">
-            <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-800 drop-shadow-sm">
-              Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Quiz</span>
+          <div className="mb-3">
+            <span className="text-3xl sm:text-4xl font-bold tracking-tight text-brand-dark">
+              Uni<span className="text-brand-sage">Quiz</span>
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-brand-dark tracking-tight">
             {isLogin ? 'З поверненням!' : 'Створіть акаунт'}
           </h1>
-          <p className="text-sm text-slate-500 mt-2 font-medium">
+          <p className="text-sm text-brand-dark/70 mt-1.5 font-normal">
             {isLogin ? 'Увійдіть, щоб продовжити навчання' : 'Твій крок до розумного навчання з AI'}
           </p>
         </div>
 
         {/* Основна картка */}
-        <div className="bg-white/80 backdrop-blur-xl p-8 sm:p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-white">
+        <div className="bg-white p-7 sm:p-9 rounded-[20px] border border-[#152A32]/10 shadow-soft">
           
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 text-sm font-medium animate-in fade-in slide-in-from-top-2">
-              <AlertCircle size={18} className="shrink-0 mt-0.5" />
-              <p>{error}</p>
+            <div 
+              role="alert" 
+              className="mb-5 p-3.5 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-[12px] flex items-start gap-2.5 text-brand-terracotta text-sm font-medium animate-fade-in"
+            >
+              <AlertCircle size={18} className="shrink-0 mt-0.5 text-brand-terracotta" />
+              <p className="leading-snug">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             
             {/* Поле Нікнейм (тільки реєстрація) */}
             {!isLogin && (
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                  <User size={20} />
+              <div>
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-dark/40 group-focus-within:text-brand-sage transition-colors pointer-events-none">
+                    <User size={18} />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    onBlur={() => handleBlur('nickname')}
+                    placeholder="Ваш нікнейм (від 3 символів)"
+                    className={`w-full pl-11 pr-4 h-[48px] sm:h-[50px] rounded-[12px] bg-white border text-sm font-medium text-brand-dark placeholder:text-brand-dark/40 outline-none transition-all ${
+                      touched.nickname && !isNicknameValid
+                        ? 'border-brand-terracotta focus:ring-4 focus:ring-brand-terracotta/20'
+                        : 'border-[#152A32]/15 focus:border-brand-sage focus:ring-4 focus:ring-brand-sage/20'
+                    }`}
+                  />
                 </div>
-                <input
-                  type="text"
-                  required
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Ваш нікнейм"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400"
-                />
+                {touched.nickname && !isNicknameValid && (
+                  <p className="text-xs text-brand-terracotta mt-1.5 ml-1">Нікнейм має містити мінімум 3 символи</p>
+                )}
               </div>
             )}
 
             {/* Поле Email */}
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                <Mail size={20} />
+            <div>
+              <div className="relative group">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-dark/40 group-focus-within:text-brand-sage transition-colors pointer-events-none">
+                  <Mail size={18} />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => handleBlur('email')}
+                  placeholder="Електронна пошта"
+                  className={`w-full pl-11 pr-4 h-[48px] sm:h-[50px] rounded-[12px] bg-white border text-sm font-medium text-brand-dark placeholder:text-brand-dark/40 outline-none transition-all ${
+                    touched.email && email.length > 0 && !isEmailValid
+                      ? 'border-brand-terracotta focus:ring-4 focus:ring-brand-terracotta/20'
+                      : 'border-[#152A32]/15 focus:border-brand-sage focus:ring-4 focus:ring-brand-sage/20'
+                  }`}
+                />
               </div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Електронна пошта"
-                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400"
-              />
+              {touched.email && email.length > 0 && !isEmailValid && (
+                <p className="text-xs text-brand-terracotta mt-1.5 ml-1">Введіть коректну електронну адресу</p>
+              )}
             </div>
 
             {/* Поле Пароль */}
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                <Lock size={20} />
+            <div>
+              <div className="relative group">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-dark/40 group-focus-within:text-brand-sage transition-colors pointer-events-none">
+                  <Lock size={18} />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => handleBlur('password')}
+                  placeholder={isLogin ? "Пароль" : "Пароль (від 8 символів)"}
+                  className={`w-full pl-11 pr-11 h-[48px] sm:h-[50px] rounded-[12px] bg-white border text-sm font-medium text-brand-dark placeholder:text-brand-dark/40 outline-none transition-all ${
+                    !isLogin && touched.password && !isPasswordValid
+                      ? 'border-brand-terracotta focus:ring-4 focus:ring-brand-terracotta/20'
+                      : 'border-[#152A32]/15 focus:border-brand-sage focus:ring-4 focus:ring-brand-sage/20'
+                  }`}
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand-dark/40 hover:text-brand-dark transition-colors focus:outline-none p-1"
+                  aria-label={showPassword ? "Сховати пароль" : "Показати пароль"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Пароль"
-                className="w-full pl-12 pr-12 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400"
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none p-1"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              {!isLogin && touched.password && !isPasswordValid && (
+                <p className="text-xs text-brand-terracotta mt-1.5 ml-1">Пароль має містити щонайменше 8 символів</p>
+              )}
             </div>
 
             {/* Поле Повторення пароля (тільки реєстрація) */}
             {!isLogin && (
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                  <Lock size={20} />
+              <div>
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-dark/40 group-focus-within:text-brand-sage transition-colors pointer-events-none">
+                    <Lock size={18} />
+                  </div>
+                  <input
+                    type={showPasswordRepeat ? "text" : "password"}
+                    required
+                    value={passwordRepeat}
+                    onChange={(e) => setPasswordRepeat(e.target.value)}
+                    onBlur={() => handleBlur('passwordRepeat')}
+                    placeholder="Повторіть пароль"
+                    className={`w-full pl-11 pr-11 h-[48px] sm:h-[50px] rounded-[12px] bg-white border text-sm font-medium text-brand-dark placeholder:text-brand-dark/40 outline-none transition-all ${
+                      touched.passwordRepeat && !isPasswordRepeatValid
+                        ? 'border-brand-terracotta focus:ring-4 focus:ring-brand-terracotta/20'
+                        : 'border-[#152A32]/15 focus:border-brand-sage focus:ring-4 focus:ring-brand-sage/20'
+                    }`}
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand-dark/40 hover:text-brand-dark transition-colors focus:outline-none p-1"
+                    aria-label={showPasswordRepeat ? "Сховати повторення пароля" : "Показати повторення пароля"}
+                  >
+                    {showPasswordRepeat ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-                <input
-                  type={showPasswordRepeat ? "text" : "password"}
-                  required
-                  value={passwordRepeat}
-                  onChange={(e) => setPasswordRepeat(e.target.value)}
-                  placeholder="Повторіть пароль"
-                  className="w-full pl-12 pr-12 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400"
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none p-1"
-                >
-                  {showPasswordRepeat ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                {touched.passwordRepeat && !isPasswordRepeatValid && (
+                  <p className="text-xs text-brand-terracotta mt-1.5 ml-1">Паролі не співпадають</p>
+                )}
               </div>
             )}
 
@@ -191,23 +274,30 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-md hover:shadow-indigo-500/25 flex justify-center items-center gap-2 disabled:opacity-70 group"
+              className={`w-full h-[48px] sm:h-[50px] mt-2 rounded-[12px] font-bold text-sm sm:text-base transition-all duration-200 shadow-soft hover:shadow-soft-hover active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-60 ${
+                isLogin
+                  ? 'bg-brand-dark hover:bg-brand-dark-hover text-brand-cream'
+                  : 'bg-brand-sage hover:bg-brand-sage-hover text-brand-cream'
+              }`}
             >
               {loading ? (
-                'Зачекайте...'
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full border-2 border-brand-cream/30 border-t-brand-cream animate-spin" />
+                  <span>Зачекайте...</span>
+                </div>
               ) : isLogin ? (
-                <>Увійти <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></>
+                <>Увійти <ArrowRight size={18} /></>
               ) : (
-                <>Створити акаунт <UserPlus size={18} className="group-hover:scale-110 transition-transform" /></>
+                <>Створити акаунт <UserPlus size={18} /></>
               )}
             </button>
           </form>
 
           {/* Розділювач */}
-          <div className="mt-8 mb-6 flex items-center gap-4">
-            <div className="flex-1 h-px bg-slate-200"></div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">або</span>
-            <div className="flex-1 h-px bg-slate-200"></div>
+          <div className="mt-6 mb-5 flex items-center gap-4">
+            <div className="flex-1 h-px bg-[#152A32]/10"></div>
+            <span className="text-xs font-semibold text-brand-dark/40 uppercase tracking-wider">або</span>
+            <div className="flex-1 h-px bg-[#152A32]/10"></div>
           </div>
 
           {/* Кнопка Google */}
@@ -215,9 +305,9 @@ export default function AuthPage() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full py-4 bg-white border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl font-bold transition-all shadow-sm flex justify-center items-center gap-3 disabled:opacity-70"
+            className="w-full h-[48px] sm:h-[50px] bg-white border border-[#152A32]/15 hover:border-[#152A32]/30 hover:bg-[#152A32]/5 text-brand-dark rounded-[12px] font-semibold text-sm transition-all flex justify-center items-center gap-3 disabled:opacity-60 active:scale-[0.98]"
           >
-            <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" className="shrink-0" aria-hidden="true">
               <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238598)">
                 <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
                 <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
@@ -230,8 +320,8 @@ export default function AuthPage() {
         </div>
 
         {/* Перемикач Вхід/Реєстрація */}
-        <div className="mt-8 text-center relative z-10">
-          <p className="text-slate-500 font-medium text-sm">
+        <div className="mt-6 text-center relative z-10">
+          <p className="text-brand-dark/70 font-normal text-sm">
             {isLogin ? 'Ще не маєте акаунту?' : 'Вже зареєстровані?'}
             <button
               type="button"
@@ -240,19 +330,20 @@ export default function AuthPage() {
                 setError(null);
                 setPassword('');
                 setPasswordRepeat('');
+                setTouched({});
               }}
-              className="ml-2 text-blue-600 font-bold hover:text-blue-800 transition-colors focus:outline-none"
+              className="ml-2 text-brand-sage hover:text-brand-sage-dark font-bold transition-colors focus:outline-none"
             >
               {isLogin ? 'Створити зараз' : 'Увійти'}
             </button>
           </p>
         </div>
 
-        {/* НОВЕ: Публічні юридичні посилання для Google OAuth */}
-        <div className="mt-6 flex justify-center items-center gap-3 text-[11px] font-medium text-slate-400 relative z-10">
-          <a href="/privacy-policy" className="hover:text-slate-600 transition-colors">Політика конфіденційності</a>
+        {/* Публічні юридичні посилання для Google OAuth */}
+        <div className="mt-6 flex justify-center items-center gap-3 text-xs font-medium text-brand-dark/50 relative z-10">
+          <a href="/privacy-policy" className="hover:text-brand-dark transition-colors">Політика конфіденційності</a>
           <span>•</span>
-          <a href="/terms-of-service" className="hover:text-slate-600 transition-colors">Умови використання</a>
+          <a href="/terms-of-service" className="hover:text-brand-dark transition-colors">Умови використання</a>
         </div>
 
       </div>

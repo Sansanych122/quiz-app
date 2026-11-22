@@ -1,0 +1,18 @@
+{
+  "name": "UniQuiz — Твій розумний AI-асистент для навчання",
+  "short_name": "UniQuiz",
+  "description": "UniQuiz перетворює лекції та конспекти на інтерактивні тести за допомогою штучного інтелекту.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFCEE",
+  "theme_color": "#FFFCEE",
+  "lang": "uk",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

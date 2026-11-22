@@ -1,32 +1,41 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
+import OfflineBanner from './components/OfflineBanner';
 
-// Імпорт всіх сторінок
-import LandingPage from './pages/LandingPage';
-import AuthPage from './pages/AuthPage';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
+// Route-based Code Splitting (Lazy Loading)
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 
-import HomePage from './pages/HomePage'; // Твій поточний Dashboard з курсами
-import CoursePage from './pages/CoursePage';
-import QuizPage from './pages/QuizPage';
-import AddCoursePage from './pages/AddCoursePage';
+const HomePage = lazy(() => import('./pages/HomePage'));
+const CoursePage = lazy(() => import('./pages/CoursePage'));
+const QuizPage = lazy(() => import('./pages/QuizPage'));
+const AddCoursePage = lazy(() => import('./pages/AddCoursePage'));
+
+// Fallback під час динамічного завантаження чанка роуту
+const PageLoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-brand-cream" role="status" aria-label="Завантаження сторінки">
+    <div className="flex flex-col items-center gap-3 text-brand-sage animate-fade-in">
+      <div className="w-8 h-8 rounded-full border-2 border-brand-sage/20 border-t-brand-sage animate-spin" />
+      <span className="text-xs font-semibold text-brand-dark/70 uppercase tracking-wider">Завантаження...</span>
+    </div>
+  </div>
+);
 
 // Компонент для захисту приватних маршрутів (тільки для авторизованих)
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-blue-600 font-medium animate-pulse">Завантаження...</div>
-      </div>
-    );
+    return <PageLoadingFallback />;
   }
   
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/auth" replace />;
   }
   
   return children;
@@ -34,66 +43,70 @@ const PrivateRoute = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        {/* === ПУБЛІЧНІ МАРШРУТИ === */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-of-service" element={<TermsOfService />} />
+    <ErrorBoundary>
+      <ToastProvider>
+        <OfflineBanner />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <Routes>
+            {/* === ПУБЛІЧНІ МАРШРУТИ === */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
 
-        {/* === ПРИВАТНІ МАРШРУТИ === */}
-        {/* Головна панель з курсами тепер живе на /dashboard */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <PrivateRoute>
-              <HomePage /> 
-            </PrivateRoute>
-          } 
-        />
-        
-        <Route 
-          path="/add-course" 
-          element={
-            <PrivateRoute>
-              <AddCoursePage />
-            </PrivateRoute>
-          } 
-        />
-        
-        <Route 
-          path="/course/:courseId" 
-          element={
-            <PrivateRoute>
-              <CoursePage />
-            </PrivateRoute>
-          } 
-        />
-        
-        {/* Маршрути для проходження тестів */}
-        <Route 
-          path="/test/:courseId" 
-          element={
-            <PrivateRoute>
-              <QuizPage />
-            </PrivateRoute>
-          } 
-        />
-        
-        <Route 
-          path="/test/section/:sectionId" 
-          element={
-            <PrivateRoute>
-              <QuizPage />
-            </PrivateRoute>
-          } 
-        />
+            {/* === ПРИВАТНІ МАРШРУТИ === */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <PrivateRoute>
+                  <HomePage /> 
+                </PrivateRoute>
+              } 
+            />
+            
+            <Route 
+              path="/add-course" 
+              element={
+                <PrivateRoute>
+                  <AddCoursePage />
+                </PrivateRoute>
+              } 
+            />
+            
+            <Route 
+              path="/course/:courseId" 
+              element={
+                <PrivateRoute>
+                  <CoursePage />
+                </PrivateRoute>
+              } 
+            />
+            
+            {/* Маршрути для проходження тестів */}
+            <Route 
+              path="/test/:courseId" 
+              element={
+                <PrivateRoute>
+                  <QuizPage />
+                </PrivateRoute>
+              } 
+            />
+            
+            <Route 
+              path="/test/section/:sectionId" 
+              element={
+                <PrivateRoute>
+                  <QuizPage />
+                </PrivateRoute>
+              } 
+            />
 
-        {/* Глобальний редирект: якщо користувач ввів неіснуючий URL -> на головну */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AuthProvider>
+            {/* Глобальний редирект */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 
