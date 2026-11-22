@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,11 +33,66 @@ export default function AddCoursePage() {
   const [parsedData, setParsedData] = useState(null);
   const [error, setError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Запобігаємо стандартній поведінці браузера (відкриття/завантаження файлу при випадковому дропі поза зоною)
+  useEffect(() => {
+    const preventDefaults = (e) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', preventDefaults);
+    window.addEventListener('drop', preventDefaults);
+    return () => {
+      window.removeEventListener('dragover', preventDefaults);
+      window.removeEventListener('drop', preventDefaults);
+    };
+  }, []);
 
   const handleFileChange = (e, type) => {
-    const selectedFile = e.target.files[0];
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (type === 'classic') {
+        setFile(selectedFile);
+      } else {
+        setAiFile(selectedFile);
+      }
+      setError(null);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFiles = e.dataTransfer?.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      const selectedFile = droppedFiles[0];
+      const ext = '.' + selectedFile.name.split('.').pop().toLowerCase();
+      if (!['.pdf', '.docx', '.doc', '.txt'].includes(ext)) {
+        setError('Непідтримуваний формат файлу. Дозволено: PDF, DOCX, DOC, TXT.');
+        return;
+      }
+      if (mode === 'classic') {
         setFile(selectedFile);
       } else {
         setAiFile(selectedFile);
@@ -320,21 +375,31 @@ export default function AddCoursePage() {
               <span className="text-[11px] font-semibold text-brand-dark/50">Формати: PDF, DOCX, TXT</span>
             </div>
 
-            <label className="relative flex flex-col items-center justify-center w-full min-h-[160px] p-6 border-2 border-dashed border-[#152A32]/15 hover:border-brand-sage rounded-[20px] bg-brand-cream/30 hover:bg-brand-cream/60 transition-all cursor-pointer group">
+            <label 
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`relative flex flex-col items-center justify-center w-full min-h-[160px] p-6 border-2 border-dashed rounded-[20px] transition-all cursor-pointer group ${
+                isDragging 
+                  ? 'border-brand-sage bg-brand-sage/15 ring-4 ring-brand-sage/20 scale-[1.01]' 
+                  : 'border-[#152A32]/15 hover:border-brand-sage bg-brand-cream/30 hover:bg-brand-cream/60'
+              }`}
+            >
               {!activeFile ? (
-                <div className="text-center">
-                  <div className="w-13 h-13 bg-white border border-[#152A32]/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-brand-sage shadow-xs group-hover:scale-105 transition-transform">
+                <div className="text-center pointer-events-none">
+                  <div className={`w-13 h-13 bg-white border border-[#152A32]/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-brand-sage shadow-xs transition-transform ${isDragging ? 'scale-110 text-brand-sage-dark' : 'group-hover:scale-105'}`}>
                     <UploadCloud size={26} />
                   </div>
                   <p className="text-sm font-bold text-brand-dark group-hover:text-brand-sage transition-colors">
-                    Натисніть або перетягніть файл сюди
+                    {isDragging ? 'Відпустіть файл для завантаження' : 'Натисніть або перетягніть файл сюди'}
                   </p>
                   <p className="text-xs text-brand-dark/50 mt-1 font-medium">
                     Максимальний розмір: до 15 МБ
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center text-center">
+                <div className="flex flex-col items-center text-center pointer-events-none">
                   <div className="w-13 h-13 bg-brand-dark text-brand-cream rounded-2xl flex items-center justify-center shadow-xs mb-3">
                     {mode === 'classic' ? <FileText size={24} /> : <BrainCircuit size={24} />}
                   </div>
@@ -342,7 +407,7 @@ export default function AddCoursePage() {
                     {activeFile.name}
                   </span>
                   <span className="text-xs text-brand-sage font-semibold mt-1">
-                    Файл обрано • Натисніть, щоб замінити
+                    {isDragging ? 'Відпустіть новий файл для заміни' : 'Файл обрано • Натисніть або перетягніть інший'}
                   </span>
                 </div>
               )}
