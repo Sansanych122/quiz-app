@@ -113,10 +113,6 @@ export default function QuizPage() {
   const [mistakesOnlyMode, setMistakesOnlyMode] = useState(false);
   const [targetMistakeIds, setTargetMistakeIds] = useState([]);
 
-  // Поетапний рендеринг списку питань (Virtualization/Batching) для сотень питань
-  const [renderedCount, setRenderedCount] = useState(30);
-  const sentinelRef = useRef(null);
-
   useEffect(() => {
     fetchQuizData();
   }, [courseId, sectionId, user.id]);
@@ -212,7 +208,6 @@ export default function QuizPage() {
       shuffledOptions: shuffleArray(q.options)
     }));
     setQuestions(shuffledQ);
-    setRenderedCount(30);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -256,14 +251,12 @@ export default function QuizPage() {
     setMistakesOnlyMode(false);
     setShowAllCorrect(false);
     setResetting(false);
-    setRenderedCount(30);
     addToast({ message: 'Прогрес тестування очищено', type: 'info' });
   };
 
   const toggleMistakesMode = async () => {
     if (mistakesOnlyMode) {
       setMistakesOnlyMode(false);
-      setRenderedCount(30);
       return;
     }
 
@@ -295,7 +288,6 @@ export default function QuizPage() {
     setMistakesOnlyMode(true);
     setShowAllCorrect(false);
     setResetting(false);
-    setRenderedCount(30);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -305,27 +297,6 @@ export default function QuizPage() {
     }
     return questions;
   }, [questions, mistakesOnlyMode, targetMistakeIds]);
-
-  // Infinite progressive batching з IntersectionObserver
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && renderedCount < visibleQuestions.length) {
-          setRenderedCount((prev) => Math.min(prev + 25, visibleQuestions.length));
-        }
-      },
-      { rootMargin: '300px' }
-    );
-
-    const currentSentinel = sentinelRef.current;
-    if (currentSentinel) {
-      observer.observe(currentSentinel);
-    }
-
-    return () => {
-      if (currentSentinel) observer.unobserve(currentSentinel);
-    };
-  }, [renderedCount, visibleQuestions.length]);
 
   // O(N) розрахунок статистики замість старого O(N^3)
   const { answeredCount, correctCount } = useMemo(() => {
@@ -353,8 +324,6 @@ export default function QuizPage() {
       </div>
     );
   }
-
-  const itemsToRender = visibleQuestions.slice(0, renderedCount);
 
   return (
     <div className="min-h-screen bg-brand-cream text-brand-dark pb-24 font-sans selection:bg-brand-sage/20 selection:text-brand-dark">
@@ -502,7 +471,7 @@ export default function QuizPage() {
         )}
 
         <div className="space-y-6">
-          {itemsToRender.map((q) => {
+          {visibleQuestions.map((q) => {
             const userAnswer = answers[q.id];
             const qIndex = questions.indexOf(q) + 1;
 
@@ -518,14 +487,6 @@ export default function QuizPage() {
             );
           })}
         </div>
-
-        {/* Sentinel для прогресивного батчингу наступних питань */}
-        {renderedCount < visibleQuestions.length && (
-          <div ref={sentinelRef} className="py-8 flex justify-center items-center text-xs text-brand-dark/50">
-            <Loader2 size={18} className="animate-spin text-brand-sage mr-2" />
-            <span>Завантаження додаткових питань ({renderedCount} з {visibleQuestions.length})...</span>
-          </div>
-        )}
       </div>
     </div>
   );
