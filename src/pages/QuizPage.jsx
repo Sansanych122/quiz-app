@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, RefreshCw, CheckCircle2, XCircle, 
-  Loader2, Shuffle, RotateCcw, Eye, EyeOff, Undo2, Check
+  Loader2, Shuffle, RotateCcw, Eye, EyeOff, Undo2, Check,
+  Trophy, Coffee, X, Heart
 } from 'lucide-react';
 import { QuizPageSkeleton } from '../components/Skeleton';
 import SEO from '../components/SEO';
@@ -19,7 +20,7 @@ const shuffleArray = (array) => {
   return newArray;
 };
 
-// Мемоізована картка окремого питання (запобігає ре-рендеру 400+ карток при кожній відповіді)
+// Мемоізована картка окремого питання (запобігає ре-рендеру всіх карток при виборі однієї відповіді)
 const QuestionCard = memo(function QuestionCard({ 
   q, 
   qIndex, 
@@ -28,13 +29,13 @@ const QuestionCard = memo(function QuestionCard({
   onAnswer 
 }) {
   return (
-    <div className="card-clean p-5 sm:p-7 bg-white rounded-[20px] border border-[#152A32]/10 shadow-soft">
+    <div className="card-clean p-5 sm:p-7 bg-white rounded-[22px] border border-[#152A32]/10 shadow-soft">
       {/* Заголовок питання з номером */}
       <div className="flex items-start gap-3.5 mb-5">
         <span className="shrink-0 w-8 h-8 flex items-center justify-center bg-brand-sage/15 text-brand-dark text-xs font-bold rounded-[10px]">
           {qIndex}
         </span>
-        <p className="font-semibold text-brand-dark text-base sm:text-lg leading-snug pt-0.5">
+        <p className="font-bold text-brand-dark text-base sm:text-lg leading-snug pt-0.5">
           {q.content}
         </p>
       </div>
@@ -45,7 +46,7 @@ const QuestionCard = memo(function QuestionCard({
           const isCorrect = opt === q.correct_answer;
           const isSelected = userAnswer?.chosen_answer === opt;
           
-          let optionStyle = "w-full min-h-[48px] px-4 py-3.5 rounded-[12px] border text-left text-sm sm:text-base font-medium flex items-center justify-between gap-3 transition-all outline-none ";
+          let optionStyle = "w-full min-h-[50px] px-4 py-3.5 rounded-[14px] border text-left text-sm sm:text-base font-medium flex items-center justify-between gap-3 transition-all outline-none ";
           
           if (showAllCorrect && isCorrect) {
             optionStyle += "bg-brand-sage/15 border-brand-sage text-brand-dark font-semibold";
@@ -68,22 +69,35 @@ const QuestionCard = memo(function QuestionCard({
               onClick={() => onAnswer(q.id, opt, q.correct_answer)} 
               className={optionStyle}
             >
-              <span className="leading-snug">{opt}</span>
+              <div className="flex items-center gap-3">
+                <span className={`w-6 h-6 rounded-full border text-xs font-bold flex items-center justify-center shrink-0 ${
+                  showAllCorrect && isCorrect
+                    ? 'border-brand-sage bg-brand-sage text-white'
+                    : userAnswer && isCorrect
+                    ? 'border-brand-sage bg-brand-sage text-white'
+                    : userAnswer && isSelected && !isCorrect
+                    ? 'border-brand-terracotta bg-brand-terracotta text-white'
+                    : 'border-[#152A32]/20 text-[#152A32]/60'
+                }`}>
+                  {String.fromCharCode(65 + oIdx)}
+                </span>
+                <span className="leading-snug">{opt}</span>
+              </div>
               
               {/* Семантичні іконки станів */}
               {showAllCorrect && isCorrect && (
                 <span className="shrink-0">
-                  <CheckCircle2 size={18} className="text-brand-sage" />
+                  <CheckCircle2 size={19} className="text-brand-sage" />
                 </span>
               )}
               {!showAllCorrect && userAnswer && isCorrect && (
                 <span className="shrink-0">
-                  <CheckCircle2 size={18} className="text-brand-sage" />
+                  <CheckCircle2 size={19} className="text-brand-sage" />
                 </span>
               )}
               {!showAllCorrect && userAnswer && isSelected && !isCorrect && (
                 <span className="shrink-0">
-                  <XCircle size={18} className="text-brand-terracotta" />
+                  <XCircle size={19} className="text-brand-terracotta" />
                 </span>
               )}
             </button>
@@ -112,6 +126,9 @@ export default function QuizPage() {
   const [showAllCorrect, setShowAllCorrect] = useState(false);
   const [mistakesOnlyMode, setMistakesOnlyMode] = useState(false);
   const [targetMistakeIds, setTargetMistakeIds] = useState([]);
+  
+  // Стан для модального вікна привітання та донату
+  const [dismissedModal, setDismissedModal] = useState(false);
 
   useEffect(() => {
     fetchQuizData();
@@ -211,7 +228,7 @@ export default function QuizPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Оптимістичний UI запис відповіді з відкладеним збереженням
+  // Оптимістичний UI запис відповіді
   const handleAnswer = useCallback(async (questionId, option, correctAnswer) => {
     if (answers[questionId] || showAllCorrect) return; 
 
@@ -251,6 +268,7 @@ export default function QuizPage() {
     setMistakesOnlyMode(false);
     setShowAllCorrect(false);
     setResetting(false);
+    setDismissedModal(false);
     addToast({ message: 'Прогрес тестування очищено', type: 'info' });
   };
 
@@ -298,7 +316,7 @@ export default function QuizPage() {
     return questions;
   }, [questions, mistakesOnlyMode, targetMistakeIds]);
 
-  // O(N) розрахунок статистики замість старого O(N^3)
+  // O(N) розрахунок статистики
   const { answeredCount, correctCount } = useMemo(() => {
     let answered = 0;
     let correct = 0;
@@ -316,6 +334,10 @@ export default function QuizPage() {
   const progressPercent = Math.round((answeredCount / (questions.length || 1)) * 100) || 0;
   const correctPercent = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0;
 
+  // Визначення повного завершення тесту
+  const isCourseFullyCompleted = questions.length > 0 && answeredCount === questions.length;
+  const showCompletionModal = isCourseFullyCompleted && !dismissedModal && !loading && !resetting;
+
   if (loading || resetting) {
     return (
       <div className="min-h-screen bg-brand-cream pb-24 font-sans">
@@ -326,7 +348,7 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream text-brand-dark pb-24 font-sans selection:bg-brand-sage/20 selection:text-brand-dark">
+    <div className="min-h-screen bg-brand-cream text-brand-dark pb-24 font-sans selection:bg-brand-sage/20 selection:text-brand-dark relative">
       <SEO 
         title={`${quizTitle} — Тест | UniQuiz`}
         description="Проходження інтерактивного тестування з підтримкою перемішування та роботи над помилками."
@@ -334,7 +356,7 @@ export default function QuizPage() {
         noindex={true}
       />
       
-      {/* ПАНЕЛЬ КЕРУВАННЯ — Тонка, sticky, фон #FFFCEE з легким blur */}
+      {/* ПАНЕЛЬ КЕРУВАННЯ — Тонка, sticky, фон #FFFCEE з розмиттям */}
       <div className="sticky top-0 z-30 bg-brand-cream/95 backdrop-blur-md border-b border-[#152A32]/10 shadow-[0_2px_12px_rgba(21,42,50,0.03)]">
         <div className="max-w-4xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
           
@@ -378,7 +400,7 @@ export default function QuizPage() {
               {/* Змішати */}
               <button 
                 onClick={handleShuffleAll} 
-                className="h-[38px] px-2.5 sm:px-3 bg-white border border-[#152A32]/15 text-brand-dark hover:border-[#152A32]/30 hover:bg-[#152A32]/5 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 focus-visible:outline-none"
+                className="h-[38px] px-2.5 sm:px-3 bg-white border border-[#152A32]/15 text-brand-dark hover:border-[#152A32]/30 hover:bg-[#152A32]/5 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 focus-visible:outline-none"
               >
                 <Shuffle size={14} className="text-brand-sage shrink-0" />
                 <span className="hidden xs:inline">Змішати</span>
@@ -387,7 +409,7 @@ export default function QuizPage() {
               {/* Відповіді */}
               <button 
                 onClick={() => setShowAllCorrect(!showAllCorrect)} 
-                className={`h-[38px] px-2.5 sm:px-3 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 focus-visible:outline-none border ${
+                className={`h-[38px] px-2.5 sm:px-3 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 focus-visible:outline-none border ${
                   showAllCorrect 
                     ? 'bg-brand-sage text-brand-cream border-brand-sage' 
                     : 'bg-white border-[#152A32]/15 text-brand-dark hover:border-[#152A32]/30 hover:bg-[#152A32]/5'
@@ -410,7 +432,7 @@ export default function QuizPage() {
               {mistakesOnlyMode ? (
                 <button 
                   onClick={toggleMistakesMode} 
-                  className="h-[38px] px-2.5 sm:px-3 bg-brand-sage text-brand-cream border border-brand-sage rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 focus-visible:outline-none"
+                  className="h-[38px] px-2.5 sm:px-3 bg-brand-sage text-brand-cream border border-brand-sage rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 focus-visible:outline-none"
                 >
                   <Undo2 size={14} className="shrink-0" />
                   <span className="hidden xs:inline">Назад</span>
@@ -418,17 +440,17 @@ export default function QuizPage() {
               ) : (
                 <button 
                   onClick={toggleMistakesMode} 
-                  className="h-[38px] px-2.5 sm:px-3 bg-white border border-[#152A32]/15 text-brand-dark hover:border-[#152A32]/30 hover:bg-[#152A32]/5 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 focus-visible:outline-none"
+                  className="h-[38px] px-2.5 sm:px-3 bg-white border border-[#152A32]/15 text-brand-dark hover:border-[#152A32]/30 hover:bg-[#152A32]/5 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 focus-visible:outline-none"
                 >
                   <RotateCcw size={14} className="text-brand-sage shrink-0" />
                   <span className="hidden xs:inline">Помилки</span>
                 </button>
               )}
 
-              {/* Скинути — із терракотовим акцентом лише на hover */}
+              {/* Скинути */}
               <button 
                 onClick={resetProgress} 
-                className="h-[38px] px-2.5 sm:px-3 bg-white border border-[#152A32]/15 text-brand-dark hover:border-brand-terracotta hover:text-brand-terracotta hover:bg-brand-terracotta/10 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 focus-visible:outline-none group"
+                className="h-[38px] px-2.5 sm:px-3 bg-white border border-[#152A32]/15 text-brand-dark hover:border-brand-terracotta hover:text-brand-terracotta hover:bg-brand-terracotta/10 rounded-[12px] text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 focus-visible:outline-none group"
               >
                 <RefreshCw size={14} className="text-brand-dark/60 group-hover:text-brand-terracotta transition-colors shrink-0" />
                 <span className="hidden xs:inline">Скинути</span>
@@ -438,7 +460,7 @@ export default function QuizPage() {
 
           </div>
 
-          {/* Смужка прогресу — висотою 4px, заливка #6E825E */}
+          {/* Смужка прогресу — висотою 4px */}
           <div 
             role="progressbar" 
             aria-valuenow={progressPercent} 
@@ -447,15 +469,15 @@ export default function QuizPage() {
             className="w-full h-1 bg-[#152A32]/8 rounded-full mt-2.5 overflow-hidden"
           >
             <div 
-              className="h-full bg-brand-sage transition-all duration-300" 
+              className="h-full bg-brand-sage transition-all duration-300 rounded-full" 
               style={{ width: `${progressPercent}%` }}
-            ></div>
+            />
           </div>
           
         </div>
       </div>
 
-      {/* ОСНОВНА КОЛОНКА ТЕСТУ — вужча колонка ~720px */}
+      {/* ОСНОВНА КОЛОНКА ТЕСТУ */}
       <div className="max-w-[720px] mx-auto px-4 mt-6 sm:mt-8">
         <h1 className="text-center text-xs sm:text-sm font-semibold text-brand-dark/60 mb-4 tracking-wide uppercase">
           {quizTitle}
@@ -464,12 +486,13 @@ export default function QuizPage() {
         {/* ІНДИКАТОР РЕЖИМУ РОБОТИ НАД ПОМИЛКАМИ */}
         {mistakesOnlyMode && (
           <div className="text-center mb-6">
-             <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-sage/15 text-brand-dark text-xs sm:text-sm font-semibold rounded-full border border-brand-sage/30 shadow-sm">
-               🚧 Робота над помилками
+             <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-sage/15 text-brand-dark text-xs sm:text-sm font-semibold rounded-full border border-brand-sage/30 shadow-xs">
+               🚧 Робота над помилками ({visibleQuestions.length} питань)
              </span>
           </div>
         )}
 
+        {/* СПИСОК ПИТАНЬ (Повний рендеринг без батчингу) */}
         <div className="space-y-6">
           {visibleQuestions.map((q) => {
             const userAnswer = answers[q.id];
@@ -488,6 +511,82 @@ export default function QuizPage() {
           })}
         </div>
       </div>
+
+      {/* ПОПАП ПРИВІТАННЯ ТА ПІДТРИМКИ (По центру екрана при повному проходженні курсу) */}
+      {showCompletionModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-[#152A32]/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-completion-title"
+          onClick={() => setDismissedModal(true)}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[26px] border border-[#152A32]/10 shadow-2xl max-w-md w-full p-6 sm:p-8 relative text-center animate-fade-in"
+          >
+            {/* Хрестик для закриття */}
+            <button
+              onClick={() => setDismissedModal(true)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-brand-dark/40 hover:text-brand-dark hover:bg-[#152A32]/5 transition-colors focus-visible:outline-none"
+              aria-label="Закрити вікно"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Іконка кубка */}
+            <div className="w-16 h-16 rounded-2xl bg-brand-sage/15 text-brand-sage flex items-center justify-center mx-auto mb-4 shadow-xs">
+              <Trophy size={32} />
+            </div>
+
+            {/* Заголовок */}
+            <h2 id="modal-completion-title" className="text-xl sm:text-2xl font-bold text-brand-dark mb-1.5 tracking-tight">
+              Курс успішно пройдено! 🎉
+            </h2>
+
+            {/* Статистика */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-cream border border-[#152A32]/10 text-xs font-semibold text-brand-dark mb-5">
+              <span>Результат: <strong>{correctCount}</strong> з <strong>{questions.length}</strong></span>
+              <span className="text-brand-dark/30">•</span>
+              <span className={correctPercent >= 70 ? 'text-brand-sage font-bold' : 'text-brand-terracotta font-bold'}>
+                {correctPercent}%
+              </span>
+            </div>
+
+            {/* Запитання та текст про підтримку розробника */}
+            <div className="space-y-2.5 text-xs sm:text-sm text-brand-dark/75 leading-relaxed mb-6">
+              <p className="font-semibold text-brand-dark">
+                Вам подобається платформа UniQuiz?
+              </p>
+              <p className="text-brand-dark/70 font-normal">
+                Ми розробляємо сервіс абсолютно безкоштовним для кожного студента. Якщо тренажер став вам у пригоді, ви можете підтримати розробника проєкту донатом на каву ☕ — будь-яка сума допомагає розвивати UniQuiz далі!
+              </p>
+            </div>
+
+            {/* Кнопки дії */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDismissedModal(true)}
+                className="w-full sm:flex-1 h-[46px] rounded-[12px] border border-[#152A32]/15 hover:bg-[#152A32]/5 text-brand-dark text-sm font-semibold transition-all"
+              >
+                Не зараз
+              </button>
+              
+              <a
+                href="https://www.privat24.ua/send/jlhil"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setDismissedModal(true)}
+                className="w-full sm:flex-1 btn-accent h-[46px] text-sm font-bold shadow-soft flex items-center justify-center gap-2"
+              >
+                <Coffee size={16} />
+                <span>Задонатити</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

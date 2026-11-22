@@ -177,8 +177,13 @@ export default function HomePage() {
         <section className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-dark">
-                {profile?.nickname ? `Привіт, ${profile.nickname}! 👋` : 'Привіт, Студенте! 👋'}
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-dark flex flex-wrap items-center gap-2.5">
+                <span>Мої курси та тренажери</span>
+                {profile?.nickname && (
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-sage/15 text-brand-dark border border-brand-sage/30">
+                    @{profile.nickname}
+                  </span>
+                )}
               </h1>
               <p className="text-xs sm:text-sm text-brand-dark/70 font-normal mt-0.5">
                 Твій розумний простір для навчання з підтримкою AI
