@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, RefreshCw, CheckCircle2, XCircle, 
   Loader2, Shuffle, RotateCcw, Eye, EyeOff, Undo2, Check,
-  Trophy, Coffee, X, Heart
+  Trophy, Coffee, X, Sparkles, AlertCircle, ChevronUp
 } from 'lucide-react';
 import { QuizPageSkeleton } from '../components/Skeleton';
 import SEO from '../components/SEO';
@@ -28,6 +28,97 @@ const QuestionCard = memo(function QuestionCard({
   showAllCorrect, 
   onAnswer 
 }) {
+  const [aiStatus, setAiStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+  const [aiStage, setAiStage] = useState('sending'); // 'sending' | 'analyzing'
+  const [aiExplanation, setAiExplanation] = useState('');
+  const [aiError, setAiError] = useState('');
+  const [isAiOpen, setIsAiOpen] = useState(false);
+
+  const abortControllerRef = useRef(null);
+  const stageTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (stageTimerRef.current) clearTimeout(stageTimerRef.current);
+    };
+  }, []);
+
+  const fetchExplanation = async () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    if (stageTimerRef.current) clearTimeout(stageTimerRef.current);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+    setAiStatus('loading');
+    setAiStage('sending');
+    setAiError('');
+    setIsAiOpen(true);
+
+    stageTimerRef.current = setTimeout(() => {
+      setAiStage('analyzing');
+    }, 450);
+
+    try {
+      const response = await fetch('/api/ask-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          question: q.content,
+          options: q.shuffledOptions,
+          correctAnswer: q.correct_answer,
+          chosenAnswer: userAnswer?.chosen_answer || '',
+        }),
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        if (response.status === 404) {
+          throw new Error('Ендпоінт /api/ask-ai недоступний локально без Wrangler. На Cloudflare Pages він працює автоматично.');
+        }
+        throw new Error('Сервер повернув неочікувану відповідь. Спробуйте пізніше.');
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не вдалося отримати пояснення від AI.');
+      }
+
+      if (!data?.explanation) {
+        throw new Error('AI повернув порожнє пояснення. Спробуйте ще раз.');
+      }
+
+      setAiExplanation(data.explanation);
+      setAiStatus('success');
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        setAiError('Час очікування відповіді від AI вичерпано. Перевірте інтернет та спробуйте ще раз.');
+      } else {
+        setAiError(err?.message || 'Виникла невідома помилка під час звернення до AI.');
+      }
+      setAiStatus('error');
+    } finally {
+      clearTimeout(timeoutId);
+      if (stageTimerRef.current) {
+        clearTimeout(stageTimerRef.current);
+        stageTimerRef.current = null;
+      }
+    }
+  };
+
+  const handleAskAI = () => {
+    if (aiStatus === 'loading') return;
+    if (aiStatus === 'success') {
+      setIsAiOpen((prev) => !prev);
+      return;
+    }
+    fetchExplanation();
+  };
+
   return (
     <div className="card-clean p-5 sm:p-7 bg-white rounded-[22px] border border-[#152A32]/10 shadow-soft">
       {/* Заголовок питання з номером */}
@@ -104,6 +195,102 @@ const QuestionCard = memo(function QuestionCard({
           );
         })}
       </div>
+
+      {/* Нижня панель з кнопкою Ask AI */}
+      <div className="mt-4 pt-3.5 border-t border-[#152A32]/8 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={handleAskAI}
+          disabled={aiStatus === 'loading'}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 focus-visible:outline-none ${
+            isAiOpen && aiStatus === 'success'
+              ? 'bg-brand-sage/15 border-brand-sage/40 text-brand-dark'
+              : 'bg-brand-cream/70 border-[#152A32]/12 text-brand-dark/80 hover:border-brand-sage hover:bg-brand-sage/10 hover:text-brand-dark'
+          } disabled:opacity-70 disabled:cursor-wait`}
+        >
+          {aiStatus === 'loading' ? (
+            <Loader2 size={13} className="animate-spin text-brand-sage" />
+          ) : (
+            <Sparkles size={13} className="text-brand-sage" />
+          )}
+          <span>
+            {aiStatus === 'loading'
+              ? 'AI пояснює...'
+              : isAiOpen && aiStatus === 'success'
+              ? 'Сховати AI'
+              : 'Ask AI'}
+          </span>
+          {aiStatus === 'success' && isAiOpen && (
+            <ChevronUp size={13} className="text-brand-dark/50" />
+          )}
+        </button>
+
+        {aiStatus === 'success' && !isAiOpen && (
+          <span className="text-[11px] font-medium text-brand-sage">
+            Пояснення збережено
+          </span>
+        )}
+      </div>
+
+      {/* Блок станів AI (прогрес по етапах, пояснення або зрозуміла помилка) */}
+      {isAiOpen && (
+        <div aria-live="polite" className="mt-3 animate-fade-in">
+          {aiStatus === 'loading' && (
+            <div className="p-3.5 rounded-[14px] bg-brand-cream-subtle border border-[#152A32]/10 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-semibold text-brand-dark/80">
+                <span className="flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin text-brand-sage shrink-0" />
+                  {aiStage === 'sending'
+                    ? 'Етап 1/2 • Надсилаємо питання до AI...'
+                    : 'Етап 2/2 • Gemini формує коротке пояснення...'}
+                </span>
+                <span className="text-[11px] text-brand-sage font-bold">
+                  {aiStage === 'sending' ? '40%' : '80%'}
+                </span>
+              </div>
+              <div className="w-full h-1 bg-[#152A32]/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand-sage transition-all duration-500 rounded-full"
+                  style={{ width: aiStage === 'sending' ? '40%' : '80%' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {aiStatus === 'error' && (
+            <div
+              role="alert"
+              className="p-3.5 rounded-[14px] bg-brand-terracotta/10 border border-brand-terracotta/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm"
+            >
+              <div className="flex items-start gap-2.5 text-brand-dark">
+                <AlertCircle size={16} className="text-brand-terracotta shrink-0 mt-0.5" />
+                <span className="leading-relaxed font-medium text-brand-dark/90">
+                  {aiError}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={fetchExplanation}
+                className="self-start sm:self-center shrink-0 px-3 py-1.5 rounded-[10px] bg-white border border-brand-terracotta/30 text-brand-terracotta hover:bg-brand-terracotta hover:text-white text-xs font-semibold transition-colors"
+              >
+                Повторити
+              </button>
+            </div>
+          )}
+
+          {aiStatus === 'success' && (
+            <div className="p-4 rounded-[14px] bg-brand-cream-subtle border border-[#152A32]/10 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-sage">
+                <Sparkles size={12} />
+                <span>Пояснення AI</span>
+              </div>
+              <p className="text-xs sm:text-sm text-brand-dark/90 leading-relaxed font-normal">
+                {aiExplanation}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 });
