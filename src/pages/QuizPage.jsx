@@ -121,14 +121,46 @@ const QuestionCard = memo(function QuestionCard({
 
   return (
     <div className="card-clean p-5 sm:p-7 bg-white rounded-[22px] border border-[#152A32]/10 shadow-soft">
-      {/* Заголовок питання з номером */}
-      <div className="flex items-start gap-3.5 mb-5">
-        <span className="shrink-0 w-8 h-8 flex items-center justify-center bg-brand-sage/15 text-brand-dark text-xs font-bold rounded-[10px]">
-          {qIndex}
-        </span>
-        <p className="font-bold text-brand-dark text-base sm:text-lg leading-snug pt-0.5">
-          {q.content}
-        </p>
+      {/* Заголовок питання з номером та кнопкою Ask AI у верхньому правому куті */}
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-start gap-3.5 min-w-0">
+          <span className="shrink-0 w-8 h-8 flex items-center justify-center bg-brand-sage/15 text-brand-dark text-xs font-bold rounded-[10px]">
+            {qIndex}
+          </span>
+          <p className="font-bold text-brand-dark text-base sm:text-lg leading-snug pt-0.5">
+            {q.content}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAskAI}
+          disabled={aiStatus === 'loading'}
+          title={aiStatus === 'success' ? (isAiOpen ? 'Сховати пояснення AI' : 'Показати пояснення AI') : 'Запитати пояснення в AI'}
+          className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold border transition-all active:scale-95 focus-visible:outline-none ${
+            isAiOpen && aiStatus === 'success'
+              ? 'bg-brand-sage/15 border-brand-sage/40 text-brand-dark'
+              : aiStatus === 'success'
+              ? 'bg-brand-sage/10 border-brand-sage/30 text-brand-dark hover:bg-brand-sage/20'
+              : 'bg-brand-cream/70 border-[#152A32]/12 text-brand-dark/80 hover:border-brand-sage hover:bg-brand-sage/10 hover:text-brand-dark'
+          } disabled:opacity-70 disabled:cursor-wait`}
+        >
+          {aiStatus === 'loading' ? (
+            <Loader2 size={13} className="animate-spin text-brand-sage" />
+          ) : (
+            <Sparkles size={13} className="text-brand-sage" />
+          )}
+          <span>
+            {aiStatus === 'loading'
+              ? 'AI...'
+              : isAiOpen && aiStatus === 'success'
+              ? 'Сховати'
+              : 'Ask AI'}
+          </span>
+          {aiStatus === 'success' && isAiOpen && (
+            <ChevronUp size={13} className="text-brand-dark/50" />
+          )}
+        </button>
       </div>
 
       {/* Варіанти відповідей */}
@@ -196,45 +228,9 @@ const QuestionCard = memo(function QuestionCard({
         })}
       </div>
 
-      {/* Нижня панель з кнопкою Ask AI */}
-      <div className="mt-4 pt-3.5 border-t border-[#152A32]/8 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={handleAskAI}
-          disabled={aiStatus === 'loading'}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 focus-visible:outline-none ${
-            isAiOpen && aiStatus === 'success'
-              ? 'bg-brand-sage/15 border-brand-sage/40 text-brand-dark'
-              : 'bg-brand-cream/70 border-[#152A32]/12 text-brand-dark/80 hover:border-brand-sage hover:bg-brand-sage/10 hover:text-brand-dark'
-          } disabled:opacity-70 disabled:cursor-wait`}
-        >
-          {aiStatus === 'loading' ? (
-            <Loader2 size={13} className="animate-spin text-brand-sage" />
-          ) : (
-            <Sparkles size={13} className="text-brand-sage" />
-          )}
-          <span>
-            {aiStatus === 'loading'
-              ? 'AI пояснює...'
-              : isAiOpen && aiStatus === 'success'
-              ? 'Сховати AI'
-              : 'Ask AI'}
-          </span>
-          {aiStatus === 'success' && isAiOpen && (
-            <ChevronUp size={13} className="text-brand-dark/50" />
-          )}
-        </button>
-
-        {aiStatus === 'success' && !isAiOpen && (
-          <span className="text-[11px] font-medium text-brand-sage">
-            Пояснення збережено
-          </span>
-        )}
-      </div>
-
       {/* Блок станів AI (прогрес по етапах, пояснення або зрозуміла помилка) */}
       {isAiOpen && (
-        <div aria-live="polite" className="mt-3 animate-fade-in">
+        <div aria-live="polite" className="mt-4 animate-fade-in">
           {aiStatus === 'loading' && (
             <div className="p-3.5 rounded-[14px] bg-brand-cream-subtle border border-[#152A32]/10 space-y-2.5">
               <div className="flex items-center justify-between text-xs font-semibold text-brand-dark/80">
