@@ -20,12 +20,13 @@ function jsonResponse(payload, status = 200) {
 }
 
 export async function onRequestPost(context) {
-  const apiKey = context.env.GOOGLE_AI_API_KEY || context.env.GEMINI_API_KEY;
+  const apiKey = (context.env?.GOOGLE_AI_API_KEY || context.env?.GEMINI_API_KEY || '').trim();
 
   if (!apiKey) {
+    const branch = context.env?.CF_PAGES_BRANCH;
     return jsonResponse(
       {
-        error: 'Сервіс AI ще не налаштований: відсутній секретний ключ GOOGLE_AI_API_KEY у налаштуваннях Cloudflare Pages.',
+        error: `Сервіс AI ще не налаштований: змінна GOOGLE_AI_API_KEY відсутня в поточному деплої Cloudflare Pages${branch ? ` (гілка: ${branch})` : ''}. Перевірте Production/Preview і виконайте Retry deployment.`,
         code: 'MISSING_API_KEY',
       },
       503
@@ -101,19 +102,16 @@ export async function onRequestPost(context) {
           },
         ],
         generationConfig: {
-          maxOutputTokens: 280,
-          thinkingConfig: {
-            thinkingLevel: 'MINIMAL',
-          },
+          maxOutputTokens: 500,
         },
       }),
     });
 
     if (!geminiRes.ok) {
-      let upstreamCode = '';
+      let upstreamStatus = '';
       try {
         const errJson = await geminiRes.json();
-        upstreamCode = errJson?.error?.status || errJson?.error?.message || '';
+        upstreamStatus = typeof errJson?.error?.status === 'string' ? errJson.error.status : '';
       } catch {
         // ігноруємо невалідний JSON помилки
       }
@@ -141,9 +139,8 @@ export async function onRequestPost(context) {
       if (geminiRes.status === 404 || geminiRes.status === 400) {
         return jsonResponse(
           {
-            error: `Не вдалося виконати запит до моделі ${GEMINI_MODEL}. Перевірте доступність моделі для вашого ключа.`,
+            error: `Не вдалося виконати запит до моделі ${GEMINI_MODEL}${upstreamStatus ? ` (${upstreamStatus})` : ''}. Перевірте доступність моделі для вашого ключа.`,
             code: 'MODEL_OR_REQUEST_ERROR',
-            detail: upstreamCode ? undefined : undefined,
           },
           502
         );
