@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, RefreshCw, CheckCircle2, XCircle, 
   Loader2, Shuffle, RotateCcw, Eye, EyeOff, Undo2, Check,
-  Trophy, Coffee, X, Sparkles, AlertCircle, ChevronUp
+  Trophy, Coffee, X, Sparkles, AlertCircle
 } from 'lucide-react';
 import { QuizPageSkeleton } from '../components/Skeleton';
 import SEO from '../components/SEO';
@@ -120,14 +120,14 @@ const QuestionCard = memo(function QuestionCard({
   };
 
   return (
-    <div className="card-clean p-5 sm:p-7 bg-white rounded-[22px] border border-[#152A32]/10 shadow-soft">
-      {/* Заголовок питання з номером та кнопкою Ask AI у верхньому правому куті */}
-      <div className="flex items-start justify-between gap-3 mb-5">
-        <div className="flex items-start gap-3.5 min-w-0">
-          <span className="shrink-0 w-8 h-8 flex items-center justify-center bg-brand-sage/15 text-brand-dark text-xs font-bold rounded-[10px]">
+    <div className="card-clean p-4 sm:p-6 bg-white rounded-[22px] border border-[#152A32]/10 shadow-soft">
+      {/* Заголовок питання з номером та компактною кнопкою Ask у верхньому правому куті */}
+      <div className="flex items-start justify-between gap-2 sm:gap-3 mb-4 sm:mb-5">
+        <div className="flex items-start gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+          <span className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-brand-sage/15 text-brand-dark text-xs font-bold rounded-[9px] sm:rounded-[10px]">
             {qIndex}
           </span>
-          <p className="font-bold text-brand-dark text-base sm:text-lg leading-snug pt-0.5">
+          <p className="font-bold text-brand-dark text-[15px] sm:text-lg leading-snug pt-0.5">
             {q.content}
           </p>
         </div>
@@ -136,30 +136,16 @@ const QuestionCard = memo(function QuestionCard({
           type="button"
           onClick={handleAskAI}
           disabled={aiStatus === 'loading'}
-          title={aiStatus === 'success' ? (isAiOpen ? 'Сховати пояснення AI' : 'Показати пояснення AI') : 'Запитати пояснення в AI'}
-          className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold border transition-all active:scale-95 focus-visible:outline-none ${
+          title={aiStatus === 'success' ? (isAiOpen ? 'Сховати пояснення' : 'Показати пояснення') : 'Пояснення від AI'}
+          className={`shrink-0 whitespace-nowrap px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-[8px] text-[11px] font-semibold border transition-all active:scale-95 focus-visible:outline-none mt-0.5 ${
             isAiOpen && aiStatus === 'success'
-              ? 'bg-brand-sage/15 border-brand-sage/40 text-brand-dark'
+              ? 'bg-brand-sage text-brand-cream border-brand-sage'
               : aiStatus === 'success'
-              ? 'bg-brand-sage/10 border-brand-sage/30 text-brand-dark hover:bg-brand-sage/20'
-              : 'bg-brand-cream/70 border-[#152A32]/12 text-brand-dark/80 hover:border-brand-sage hover:bg-brand-sage/10 hover:text-brand-dark'
-          } disabled:opacity-70 disabled:cursor-wait`}
+              ? 'bg-brand-sage/15 border-brand-sage/35 text-brand-dark hover:bg-brand-sage/25'
+              : 'bg-brand-cream/80 border-[#152A32]/15 text-brand-dark/75 hover:border-brand-sage hover:bg-brand-sage/10 hover:text-brand-dark'
+          } disabled:opacity-60 disabled:cursor-wait`}
         >
-          {aiStatus === 'loading' ? (
-            <Loader2 size={13} className="animate-spin text-brand-sage" />
-          ) : (
-            <Sparkles size={13} className="text-brand-sage" />
-          )}
-          <span>
-            {aiStatus === 'loading'
-              ? 'AI...'
-              : isAiOpen && aiStatus === 'success'
-              ? 'Сховати'
-              : 'Ask AI'}
-          </span>
-          {aiStatus === 'success' && isAiOpen && (
-            <ChevronUp size={13} className="text-brand-dark/50" />
-          )}
+          {aiStatus === 'loading' ? '...' : isAiOpen && aiStatus === 'success' ? 'Сховати' : 'Ask'}
         </button>
       </div>
 

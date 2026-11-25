@@ -20,13 +20,26 @@ function jsonResponse(payload, status = 200) {
 }
 
 export async function onRequestPost(context) {
-  const apiKey = (context.env?.GOOGLE_AI_API_KEY || context.env?.GEMINI_API_KEY || '').trim();
+  const rawGoogleKey = context.env?.GOOGLE_AI_API_KEY;
+  const rawGeminiKey = context.env?.GEMINI_API_KEY;
+  const apiKey = (
+    (typeof rawGoogleKey === 'string' ? rawGoogleKey : '') ||
+    (typeof rawGeminiKey === 'string' ? rawGeminiKey : '')
+  ).trim();
 
   if (!apiKey) {
-    const branch = context.env?.CF_PAGES_BRANCH;
+    const branch = context.env?.CF_PAGES_BRANCH || 'unknown';
+    const envKeys = Object.keys(context.env || {}).join(', ') || 'none';
+    const keyState =
+      rawGoogleKey === undefined
+        ? 'undefined'
+        : typeof rawGoogleKey === 'string'
+        ? `empty(len=${rawGoogleKey.length})`
+        : typeof rawGoogleKey;
+
     return jsonResponse(
       {
-        error: `Сервіс AI ще не налаштований: змінна GOOGLE_AI_API_KEY відсутня в поточному деплої Cloudflare Pages${branch ? ` (гілка: ${branch})` : ''}. Перевірте Production/Preview і виконайте Retry deployment.`,
+        error: `Сервіс AI не бачить ключ GOOGLE_AI_API_KEY (${keyState}, гілка: ${branch}, доступні змінні: ${envKeys}).`,
         code: 'MISSING_API_KEY',
       },
       503
